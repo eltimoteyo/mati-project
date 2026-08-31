@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "CONIT NestJS",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2023"],
+    "types": ["node"],
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "declaration": false,
+    "declarationMap": false,
+    "isolatedModules": false,
+
+    "strictBindCallApply": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": false,
+    "noImplicitAny": true,
+
+    "outDir": "./dist",
+    "baseUrl": "./"
+  }
+}

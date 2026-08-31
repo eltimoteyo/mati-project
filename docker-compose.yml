@@ -1,0 +1,120 @@
+# =============================================================================
+# CONIT SUPPORT — Orquestacion local
+# -----------------------------------------------------------------------------
+#   docker compose up -d          Levanta PostgreSQL, la API y el panel
+#   docker compose up -d postgres Solo la base de datos (desarrollo con pnpm)
+#   docker compose logs -f api    Registros de la API
+#   docker compose down           Detiene los servicios (conserva los datos)
+#   docker compose down -v        Detiene y ELIMINA los datos
+#
+# Las variables se leen del archivo `.env` de la raiz (ver `.env.example`).
+# =============================================================================
+
+name: conit-support
+
+services:
+  # ---------------------------------------------------------------------------
+  # Base de datos
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: conit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-conit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-conit_support}
+      # Acelera el arranque y evita diferencias de collation entre entornos.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      # PostgreSQL 18+ espera el montaje en `/var/lib/postgresql` (no en
+      # `.../data`): la imagen coloca los datos en un subdirectorio por version
+      # mayor, lo que permite `pg_upgrade --link` sin cruzar puntos de montaje.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # La API espera a que este healthcheck pase antes de arrancar.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-conit} -d ${POSTGRES_DB:-conit_support}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - conit
+
+  # ---------------------------------------------------------------------------
+  # API (NestJS)
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: conit-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      API_PREFIX: ${API_PREFIX:-api/v1}
+      # Dentro de la red de compose el host es el nombre del servicio.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-conit}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-conit_support}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?define JWT_SECRET en .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?define JWT_REFRESH_SECRET en .env}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      JWT_REFRESH_REMEMBER_EXPIRES_IN: ${JWT_REFRESH_REMEMBER_EXPIRES_IN:-30d}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      # Solo se usan al ejecutar `pnpm db:seed` dentro del contenedor.
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      CLIENT_NAME: ${CLIENT_NAME:-}
+      CLIENT_EMAIL: ${CLIENT_EMAIL:-}
+      CLIENT_PASSWORD: ${CLIENT_PASSWORD:-}
+    ports:
+      - '${API_PORT:-4000}:4000'
+    networks:
+      - conit
+
+  # ---------------------------------------------------------------------------
+  # Panel (Next.js)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        # Es el navegador quien llama a la API, por eso la URL debe ser la
+        # publica del host y no el nombre interno del servicio.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-CONIT Support}
+    container_name: conit-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    networks:
+      - conit
+
+volumes:
+  postgres-data:
+    name: conit-postgres-data
+
+networks:
+  conit:
+    name: conit-network
+    driver: bridge

@@ -1,0 +1,377 @@
+/* =============================================================================
+   CONIT SUPPORT — Tokens de diseno corporativo
+   -----------------------------------------------------------------------------
+   Fuente unica de verdad del sistema visual. Se importa desde
+   `apps/web/src/app/globals.css` justo despues de `@import "tailwindcss"`.
+
+   La paleta deriva del logotipo oficial de CONIT Support Desk:
+     - Azul corporativo  #024A9D  ->  --brand-700
+     - Ambar de acento   #F9AB38  ->  --gold-500
+     - Azul claro        #4A9CE8  ->  --brand-400 / graficos
+
+   Principios:
+   - El ambar es acento, no color de relleno: se reserva para alertas y para
+     destacar una sola cifra por vista.
+   - Bordes de 1px y superficie para marcar elevacion, en lugar de sombras.
+   - Todo token existe en claro y oscuro.
+   ============================================================================= */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* --- Radios --------------------------------------------------------------- */
+  --radius: 0.625rem;
+
+  /* --- Escala de marca (azul corporativo) ----------------------------------- */
+  --brand-50: oklch(0.968 0.016 257);
+  --brand-100: oklch(0.928 0.036 257);
+  --brand-200: oklch(0.868 0.066 257);
+  --brand-300: oklch(0.782 0.098 256);
+  --brand-400: oklch(0.676 0.138 252);
+  --brand-500: oklch(0.548 0.158 257);
+  --brand-600: oklch(0.478 0.158 257);
+  /* Color exacto del logotipo */
+  --brand-700: oklch(0.4233 0.1493 257.1);
+  --brand-800: oklch(0.368 0.128 257);
+  --brand-900: oklch(0.315 0.105 258);
+  --brand-950: oklch(0.238 0.078 258);
+
+  /* --- Escala de acento (ambar) --------------------------------------------- */
+  --gold-50: oklch(0.972 0.022 78);
+  --gold-100: oklch(0.945 0.05 76);
+  --gold-200: oklch(0.902 0.086 75);
+  --gold-300: oklch(0.858 0.118 74);
+  --gold-400: oklch(0.828 0.14 73);
+  /* Color exacto del logotipo */
+  --gold-500: oklch(0.7984 0.1527 71.9);
+  --gold-600: oklch(0.735 0.148 66);
+  --gold-700: oklch(0.638 0.132 60);
+  --gold-800: oklch(0.532 0.108 56);
+  --gold-900: oklch(0.44 0.086 54);
+
+  /* --- Superficies ---------------------------------------------------------- */
+  --background: oklch(0.993 0.0015 250);
+  --foreground: oklch(0.205 0.012 253);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.012 253);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.012 253);
+
+  /* Lienzo lateral: ligeramente distinto del fondo para separar sin bordes duros */
+  --sidebar: oklch(0.985 0.002 250);
+  --sidebar-foreground: oklch(0.36 0.012 253);
+  --sidebar-accent: oklch(0.952 0.008 254);
+  --sidebar-accent-foreground: oklch(0.245 0.012 253);
+  --sidebar-border: oklch(0.922 0.005 250);
+  --sidebar-ring: var(--brand-700);
+
+  /* --- Semanticos ----------------------------------------------------------- */
+  --primary: var(--brand-700);
+  --primary-foreground: oklch(0.99 0.002 250);
+
+  --secondary: oklch(0.965 0.004 250);
+  --secondary-foreground: oklch(0.28 0.012 253);
+
+  --muted: oklch(0.968 0.003 250);
+  --muted-foreground: oklch(0.512 0.014 253);
+
+  --accent: oklch(0.956 0.01 254);
+  --accent-foreground: oklch(0.245 0.014 253);
+
+  --destructive: oklch(0.575 0.212 25.5);
+  --destructive-foreground: oklch(0.99 0.002 250);
+
+  --success: oklch(0.598 0.132 158);
+  --success-foreground: oklch(0.99 0.002 250);
+
+  /* El aviso usa el ambar de marca: coherente con el logotipo. */
+  --warning: var(--gold-700);
+  --warning-foreground: oklch(0.99 0.01 78);
+
+  --info: var(--brand-400);
+  --info-foreground: oklch(0.99 0.002 250);
+
+  --border: oklch(0.918 0.005 250);
+  --input: oklch(0.905 0.006 250);
+  --ring: var(--brand-700);
+
+  /* --- Graficos (Recharts) --------------------------------------------------- */
+  --chart-1: var(--brand-700);
+  --chart-2: var(--brand-400);
+  --chart-3: var(--gold-500);
+  --chart-4: oklch(0.598 0.132 158);
+  --chart-5: oklch(0.575 0.212 25.5);
+}
+
+.dark {
+  --background: oklch(0.171 0.008 256);
+  --foreground: oklch(0.965 0.003 250);
+
+  --card: oklch(0.208 0.009 256);
+  --card-foreground: oklch(0.965 0.003 250);
+
+  --popover: oklch(0.222 0.01 256);
+  --popover-foreground: oklch(0.965 0.003 250);
+
+  --sidebar: oklch(0.191 0.009 256);
+  --sidebar-foreground: oklch(0.742 0.012 253);
+  --sidebar-accent: oklch(0.262 0.016 256);
+  --sidebar-accent-foreground: oklch(0.968 0.003 250);
+  --sidebar-border: oklch(0.278 0.011 256);
+  --sidebar-ring: oklch(0.646 0.152 254);
+
+  /* En oscuro el azul del logotipo queda demasiado apagado: se aclara para
+     mantener el contraste sin abandonar el tono corporativo. */
+  --primary: oklch(0.6 0.16 256);
+  --primary-foreground: oklch(0.985 0.004 250);
+
+  --secondary: oklch(0.262 0.011 256);
+  --secondary-foreground: oklch(0.945 0.004 250);
+
+  --muted: oklch(0.252 0.01 256);
+  --muted-foreground: oklch(0.688 0.013 253);
+
+  --accent: oklch(0.278 0.014 256);
+  --accent-foreground: oklch(0.968 0.003 250);
+
+  --destructive: oklch(0.652 0.196 25.5);
+  --destructive-foreground: oklch(0.16 0.02 25);
+
+  --success: oklch(0.685 0.135 158);
+  --success-foreground: oklch(0.16 0.03 158);
+
+  --warning: var(--gold-400);
+  --warning-foreground: oklch(0.19 0.04 74);
+
+  --info: oklch(0.712 0.122 249);
+  --info-foreground: oklch(0.16 0.03 249);
+
+  --border: oklch(0.288 0.011 256);
+  --input: oklch(0.315 0.012 256);
+  --ring: oklch(0.646 0.152 254);
+
+  --chart-1: oklch(0.646 0.152 254);
+  --chart-2: oklch(0.756 0.108 249);
+  --chart-3: var(--gold-400);
+  --chart-4: oklch(0.685 0.135 158);
+  --chart-5: oklch(0.652 0.196 25.5);
+}
+
+/* -----------------------------------------------------------------------------
+   Mapeo de variables CSS a utilidades de Tailwind v4.
+   `inline` hace que Tailwind resuelva el var() en tiempo de compilacion,
+   permitiendo modificadores de opacidad como `bg-primary/10`.
+   ----------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-gold-50: var(--gold-50);
+  --color-gold-100: var(--gold-100);
+  --color-gold-200: var(--gold-200);
+  --color-gold-300: var(--gold-300);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --color-gold-700: var(--gold-700);
+  --color-gold-800: var(--gold-800);
+  --color-gold-900: var(--gold-900);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-xs: calc(var(--radius) - 6px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+
+  /* Sombras deliberadamente discretas: elevacion por borde, no por blur. */
+  --shadow-subtle: 0 1px 2px 0 oklch(0.2 0.02 255 / 0.04);
+  --shadow-raised:
+    0 1px 2px 0 oklch(0.2 0.02 255 / 0.05), 0 4px 12px -2px oklch(0.2 0.02 255 / 0.06);
+  --shadow-overlay:
+    0 4px 8px -2px oklch(0.2 0.02 255 / 0.06), 0 16px 40px -8px oklch(0.2 0.02 255 / 0.12);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.28s var(--ease-out-quint) both;
+  --animate-rise: rise 0.42s var(--ease-out-quint) both;
+
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Foco visible y consistente en todo el sistema (accesibilidad). */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* Jerarquia tipografica: titulos con tracking negativo, cuerpo neutro. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Respeta la preferencia del sistema de reducir movimiento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Scrollbar discreta, alineada con la paleta. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
+
+@layer utilities {
+  /* Superficie base de las secciones del panel. */
+  .surface {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  /* Texto tabular para metricas y codigos de ticket. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Reticula tecnica de fondo. Toma el color (y su alfa) del contenedor via
+   * `currentColor`, de modo que la intensidad se controla con utilidades
+   * como `text-white/5` en lugar de estilos en linea.
+   */
+  .pattern-grid {
+    background-image:
+      linear-gradient(to right, currentColor 1px, transparent 1px),
+      linear-gradient(to bottom, currentColor 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+}

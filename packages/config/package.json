@@ -1,0 +1,35 @@
+{
+  "name": "@conit/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Configuraciones compartidas (TypeScript, ESLint, Prettier) del monorepo CONIT Support",
+  "files": [
+    "tsconfig",
+    "eslint",
+    "prettier.mjs"
+  ],
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/nextjs.json": "./tsconfig/nextjs.json",
+    "./tsconfig/nestjs.json": "./tsconfig/nestjs.json",
+    "./tsconfig/react-library.json": "./tsconfig/react-library.json",
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/next": "./eslint/next.mjs",
+    "./eslint/nest": "./eslint/nest.mjs",
+    "./eslint/react-library": "./eslint/react-library.mjs",
+    "./prettier": "./prettier.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-simple-import-sort": "12.1.1",
+    "globals": "16.5.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "typescript": ">=5.5"
+  }
+}

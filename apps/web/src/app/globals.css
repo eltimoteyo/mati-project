@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/* Tokens del design system corporativo (paleta, radios, sombras, animaciones). */
+@import '@conit/ui/styles/theme.css';
+
+/*
+ * Tailwind no rastrea `node_modules` por defecto. `@conit/ui` es un paquete
+ * interno del monorepo, asi que hay que declarar su codigo fuente de forma
+ * explicita para que sus clases lleguen al CSS final.
+ */
+@source '../../../../packages/ui/src';

@@ -1,0 +1,36 @@
+# Dependencias y artefactos: se reinstalan y recompilan dentro de la imagen.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+# Cliente Prisma generado: se vuelve a generar durante el build.
+apps/api/src/generated
+
+# Secretos: nunca deben entrar en una imagen.
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Control de versiones y herramientas
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Documentacion y recursos no necesarios en tiempo de ejecucion
+*.md
+!apps/api/src/README.md
+logo_conit.png
+logo-conit.png
+
+# Registros y temporales
+logs
+*.log
+tmp
+temp
