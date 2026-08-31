@@ -1,17 +1,12 @@
 import type { Metadata } from 'next';
 
-import { ModulePlaceholder } from '@/components/common/module-placeholder';
+import { AuditView } from '@/components/audit/audit-view';
 
 export const metadata: Metadata = {
-  title: 'Historial',
+  title: 'Historial de Auditoría',
+  description: 'Registro de auditoría cronológico de todos los cambios sobre los tickets.',
 };
 
-const SCOPE = [
-  'Registro de auditoria de cambios sobre cada entidad.',
-  'Autor, fecha y valores anteriores de cada modificacion.',
-  'Filtrado por usuario, entidad y rango de fechas.',
-];
-
 export default function HistorialPage() {
-  return <ModulePlaceholder href="/admin/historial" scope={SCOPE} />;
+  return <AuditView />;
 }
