@@ -5,6 +5,34 @@ const ACCESS_COOKIE = 'conit_at';
 const REFRESH_COOKIE = 'conit_rt';
 
 /**
+ * Indica si la API vive en otro origen distinto del de esta web.
+ *
+ * Cuando es asi (por ejemplo, web en `conit.novatec.ink` y API en
+ * `api.conit.novatec.ink`), la cookie de sesion la emite el dominio de la API
+ * y es *host-only*: el navegador la envia a la API, pero **no** a esta web. Es
+ * decir, aqui nunca se ve, y la comprobacion de mas abajo daria siempre
+ * "sin sesion", dejando `/admin` y `/portal` rebotando al login para siempre.
+ *
+ * La alternativa habitual es compartir la cookie con `Domain=.novatec.ink`,
+ * pero eso la expone a **todos** los subdominios del dominio raiz, incluido lo
+ * que haya en el apex. No compensa: esta guarda es solo cosmetica —lo dice el
+ * comentario de abajo— y quien autoriza de verdad es la API en cada peticion,
+ * con `AuthGuard` confirmandolo contra `/users/me` antes de pintar nada.
+ */
+function apiIsCrossOrigin(request: NextRequest): boolean {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  // Sin configurar, o con una ruta relativa, la API comparte origen.
+  if (!apiUrl || apiUrl.startsWith('/')) return false;
+
+  try {
+    return new URL(apiUrl).host !== request.nextUrl.host;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Guarda de rutas del panel (convencion `proxy` de Next.js 16, antes
  * `middleware`).
  *
@@ -14,10 +42,16 @@ const REFRESH_COOKIE = 'conit_rt';
  * autorizacion efectiva la aplica la API en cada peticion.
  *
  * Su valor es de experiencia de uso: evita renderizar el panel para
- * redirigir un instante despues.
+ * redirigir un instante despues. Cuando no puede leer la cookie, se aparta y
+ * deja pasar: `AuthGuard` resuelve el caso correctamente, solo que mostrando
+ * un instante de "verificando tu sesion".
  */
 export default function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  if (apiIsCrossOrigin(request)) {
+    return NextResponse.next();
+  }
 
   const hasSession = request.cookies.has(ACCESS_COOKIE) || request.cookies.has(REFRESH_COOKIE);
 
