@@ -155,8 +155,24 @@ export class ClientsService {
       );
     }
 
-    // Sus proyectos se eliminan en cascada; sin tickets, no hay historial que perder.
-    await this.prisma.client.delete({ where: { id } });
+    // La cuenta del portal se retira con la ficha. La relacion es `SetNull`,
+    // asi que sin esto quedaria un usuario con rol CLIENT sin cliente al que
+    // pertenecer: podria iniciar sesion, no podria hacer nada, y nadie sabria
+    // de donde salio.
+    const portalUser = await this.prisma.client.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      // Los proyectos se eliminan en cascada; sin tickets, no hay historial
+      // que perder.
+      await tx.client.delete({ where: { id } });
+
+      if (portalUser?.userId) {
+        await tx.user.delete({ where: { id: portalUser.userId } });
+      }
+    });
   }
 
   private async assertTaxIdAvailable(taxId: string | null, excludeId?: string): Promise<void> {

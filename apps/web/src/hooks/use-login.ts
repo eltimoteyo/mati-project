@@ -1,6 +1,6 @@
 'use client';
 
-import type { LoginRequest, LoginResponse } from '@conit/types';
+import { type LoginRequest, type LoginResponse, USER_ROLES, type UserRole } from '@conit/types';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
@@ -10,18 +10,27 @@ import { notify } from '@/lib/notify';
 import { queryKeys } from '@/lib/query-keys';
 import { authService } from '@/services/auth.service';
 
+/** Destino por defecto segun el rol: el equipo al panel, el cliente al portal. */
+export function homeForRole(role: UserRole): string {
+  return role === USER_ROLES.CLIENT ? siteConfig.routes.portal : siteConfig.routes.dashboard;
+}
+
 /**
- * Acepta unicamente rutas internas del panel.
+ * Acepta unicamente rutas internas, y solo las del area que corresponde al rol.
  *
- * Sin esta comprobacion, un enlace del tipo `/login?from=https://otro-sitio`
- * convertiria el inicio de sesion en un redireccionamiento abierto.
+ * Sin la primera comprobacion, un enlace del tipo `/login?from=https://otro-sitio`
+ * convertiria el inicio de sesion en un redireccionamiento abierto. Sin la
+ * segunda, un cliente acabaria en `/admin` para toparse con "Acceso
+ * restringido", que parece un error del sistema y no lo es.
  */
-export function sanitizeRedirect(target: string | undefined): string {
-  if (!target) return siteConfig.routes.dashboard;
+export function sanitizeRedirect(target: string | undefined, role: UserRole): string {
+  const fallback = homeForRole(role);
 
-  const isInternalAdminPath = target.startsWith('/admin') && !target.startsWith('//');
+  if (!target || target.startsWith('//')) return fallback;
 
-  return isInternalAdminPath ? target : siteConfig.routes.dashboard;
+  const area = role === USER_ROLES.CLIENT ? '/portal' : '/admin';
+
+  return target.startsWith(area) ? target : fallback;
 }
 
 /**
@@ -34,7 +43,6 @@ export function sanitizeRedirect(target: string | undefined): string {
 export function useLogin(redirectTo?: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const destination = sanitizeRedirect(redirectTo);
 
   return useMutation<LoginResponse, ApiError, LoginRequest>({
     mutationFn: (credentials) => authService.login(credentials),
@@ -46,7 +54,9 @@ export function useLogin(redirectTo?: string) {
         description: `Bienvenido nuevamente, ${response.user.name}.`,
       });
 
-      router.replace(destination);
+      // El destino se decide aqui y no al montar el formulario: hasta que no
+      // responde la API no se sabe con que rol entra quien inicia sesion.
+      router.replace(sanitizeRedirect(redirectTo, response.user.role));
       // Revalida los componentes de servidor para que el middleware vea la cookie.
       router.refresh();
     },

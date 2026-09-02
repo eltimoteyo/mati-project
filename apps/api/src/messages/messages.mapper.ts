@@ -1,4 +1,8 @@
-import type { Message as MessageContract, MessageVisibility } from '@conit/types';
+import type {
+  Message as MessageContract,
+  MessageSource,
+  MessageVisibility,
+} from '@conit/types';
 
 import type { Message, User } from '../generated/prisma/client';
 import { toUserRef } from '../tickets/tickets.mapper';
@@ -18,6 +22,7 @@ export function toMessage(message: MessageRecord): MessageContract {
     ticketId: message.ticketId,
     body: message.body,
     visibility: message.visibility as MessageVisibility,
+    source: message.source as MessageSource,
     author: toUserRef(message.author),
     readAt: message.readAt?.toISOString() ?? null,
     editedAt: message.editedAt?.toISOString() ?? null,

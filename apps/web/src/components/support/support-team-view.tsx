@@ -1,6 +1,6 @@
 'use client';
 
-import { type SupportAgent,USER_STATUSES } from '@conit/types';
+import { type PublicUser, type SupportAgent, USER_STATUSES } from '@conit/types';
 import {
   Avatar,
   AvatarFallback,
@@ -20,13 +20,18 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { HeadphonesIcon, TriangleAlertIcon, UserPlusIcon } from 'lucide-react';
+import { HeadphonesIcon, KeyRoundIcon, PencilIcon, PlusIcon, TriangleAlertIcon, UserPlusIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { PageHeader } from '@/components/common/page-header';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
+import { useUsers } from '@/hooks/use-users';
 import { apiClient } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+
+import { AgentFormDialog } from './agent-form-dialog';
+import { ResetPasswordDialog } from './reset-password-dialog';
 
 interface SupportTeamResponse {
   agents: SupportAgent[];
@@ -35,7 +40,7 @@ interface SupportTeamResponse {
 
 function useSupportTeam() {
   return useQuery({
-    queryKey: [...queryKeys.users.all, 'team'] as const,
+    queryKey: queryKeys.users.team(),
     queryFn: () => apiClient.get<SupportTeamResponse>('/users/team'),
     staleTime: 60_000,
   });
@@ -107,20 +112,125 @@ function AgentCard({ agent }: { agent: SupportAgent }) {
 }
 
 /**
+ * Cuentas del equipo.
+ *
+ * Se lista aparte de las tarjetas de carga porque responde a otra pregunta:
+ * las tarjetas dicen quien esta saturado; esta tabla, quien tiene acceso.
+ * Incluye a los usuarios inactivos, que por definicion no aparecen arriba.
+ */
+function AccountsCard({
+  onEdit,
+  onResetPassword,
+}: {
+  onEdit: (user: PublicUser) => void;
+  onResetPassword: (user: PublicUser) => void;
+}) {
+  const query = useUsers({ pageSize: 50 });
+
+  return (
+    <Card>
+      <CardHeader className="flex-col items-start gap-1">
+        <CardTitle>Cuentas del equipo</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Quien tiene acceso al panel. Desactivar una cuenta cierra sus sesiones al momento.
+        </p>
+      </CardHeader>
+
+      <CardContent>
+        {query.isError ? (
+          <ErrorState onRetry={() => void query.refetch()} />
+        ) : query.isPending ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Skeleton key={index} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[38rem] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th className="pb-2.5 font-medium text-muted-foreground">Nombre</th>
+                  <th className="pb-2.5 font-medium text-muted-foreground">Correo</th>
+                  <th className="pb-2.5 font-medium text-muted-foreground">Rol</th>
+                  <th className="pb-2.5 font-medium text-muted-foreground">Estado</th>
+                  <th className="pb-2.5 text-right font-medium text-muted-foreground">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {query.data.items.map((user) => (
+                  <tr key={user.id} className="border-b border-border/60 last:border-0">
+                    <td className="py-2.5 text-foreground">{user.name}</td>
+                    <td className="py-2.5 text-muted-foreground">{user.email}</td>
+                    <td className="py-2.5 text-muted-foreground">
+                      {user.role === 'ADMIN' ? 'Soporte' : 'Cliente'}
+                    </td>
+                    <td className="py-2.5">
+                      <Badge variant={user.status === USER_STATUSES.ACTIVE ? 'success' : 'neutral'}>
+                        {user.status === USER_STATUSES.ACTIVE ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Editar a ${user.name}`}
+                          onClick={() => onEdit(user)}
+                        >
+                          <PencilIcon />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Restablecer la contrasena de ${user.name}`}
+                          onClick={() => onResetPassword(user)}
+                        >
+                          <KeyRoundIcon />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * Equipo de soporte.
  *
- * Muestra el reparto real de la carga a partir de los tickets asignados. No
- * gestiona altas de usuario: crear cuentas es administracion de accesos y
- * llegara con su propio modulo.
+ * Muestra el reparto real de la carga a partir de los tickets asignados y
+ * permite gestionar las cuentas del equipo: alta, edicion, activacion y
+ * restablecimiento de contrasena.
  */
 export function SupportTeamView() {
   const query = useSupportTeam();
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<PublicUser | null>(null);
+  const [resetting, setResetting] = useState<PublicUser | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Encargado de soporte"
-        description="Reparto de la carga de trabajo entre el equipo."
+        description="Reparto de la carga de trabajo y gestion de las cuentas del equipo."
+        actions={
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <PlusIcon />
+            Nuevo miembro
+          </Button>
+        }
       />
 
       {query.isError ? (
@@ -177,20 +287,28 @@ export function SupportTeamView() {
             </div>
           )}
 
-          <Card>
-            <CardHeader className="flex-col items-start gap-1">
-              <CardTitle>Sobre este modulo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                En esta fase el equipo de soporte son los usuarios con rol de administrador. La
-                gestion de cuentas —alta, baja y cambio de rol— pertenece al modulo de
-                administracion de accesos, que aun no esta desarrollado.
-              </p>
-            </CardContent>
-          </Card>
+          <AccountsCard onEdit={setEditing} onResetPassword={setResetting} />
         </>
       )}
+
+      <AgentFormDialog
+        open={formOpen || editing !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setFormOpen(false);
+            setEditing(null);
+          }
+        }}
+        user={editing}
+      />
+
+      <ResetPasswordDialog
+        open={resetting !== null}
+        onOpenChange={(next) => {
+          if (!next) setResetting(null);
+        }}
+        user={resetting}
+      />
     </div>
   );
 }

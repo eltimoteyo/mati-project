@@ -43,6 +43,14 @@ export interface AiCompletionOptions {
   maxTokens?: number;
   /** Permite cancelar la peticion si el cliente abandona. */
   signal?: AbortSignal;
+  /**
+   * Comprueba si la respuesta sirve.
+   *
+   * Cuando devuelve `false`, el proveedor considera el intento fallido y prueba
+   * con el siguiente modelo. Es lo que permite exigir JSON valido sin que cada
+   * modulo tenga que conocer la lista de modelos ni reintentar por su cuenta.
+   */
+  validate?: (content: string) => boolean;
 }
 
 export interface AiUsage {

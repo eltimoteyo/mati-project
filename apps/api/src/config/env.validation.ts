@@ -91,6 +91,66 @@ export const envSchema = z.object({
 
   // --- Documentacion --------------------------------------------------------
   SWAGGER_ENABLED: envBoolean(true),
+
+  // --- Asistente de IA ------------------------------------------------------
+  // Todas opcionales: sin clave, el modulo se declara no disponible y el resto
+  // del sistema arranca y funciona igual.
+  OPENROUTER_API_KEY: z.string().trim().optional(),
+  /**
+   * Modelo principal.
+   *
+   * Por defecto uno gratuito, para que el asistente funcione con una cuenta sin
+   * saldo. Con creditos en OpenRouter, `anthropic/claude-haiku-4.5` da mejor
+   * calidad por muy poco coste y basta con cambiar esta linea.
+   */
+  OPENROUTER_MODEL: z.string().trim().default('nvidia/nemotron-3-super-120b-a12b:free'),
+  /**
+   * Modelos de reserva, separados por comas.
+   *
+   * Los modelos gratuitos comparten cupo entre todos los usuarios de OpenRouter
+   * y devuelven 429 con frecuencia; sin reserva, el asistente quedaria caido en
+   * cuanto uno se saturase.
+   */
+  OPENROUTER_FALLBACK_MODELS: z
+    .string()
+    .trim()
+    .default('z-ai/glm-5.2:free,google/gemma-4-31b-it:free,minimax/minimax-m3:free'),
+  OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+
+  // --- Correo saliente ------------------------------------------------------
+  RESEND_API_KEY: z.string().trim().optional(),
+  /**
+   * Remitente. Debe pertenecer a un dominio verificado en Resend; mientras no
+   * lo este, `onboarding@resend.dev` solo entrega al correo del titular.
+   */
+  MAIL_FROM: z.string().trim().default('CONIT Support <onboarding@resend.dev>'),
+  MAIL_REPLY_TO: z.string().trim().optional(),
+  /**
+   * URL publica del logo que se incrusta en los correos.
+   *
+   * Tiene que ser accesible desde internet: el cliente de correo la descarga
+   * desde el navegador del destinatario, asi que una ruta de localhost se veria
+   * rota. Si se deja vacia, el correo muestra el nombre en tipografia de marca
+   * en lugar de la imagen.
+   */
+  MAIL_LOGO_URL: z.string().trim().optional(),
+  /** Desactiva el envio sin tener que borrar la clave. */
+  MAIL_ENABLED: envBoolean(true),
+
+  /**
+   * Secreto del webhook de correo entrante (Resend / Svix), con prefijo
+   * `whsec_`. Sin el, la recepcion de correo queda desactivada: aceptar
+   * webhooks sin firmar permitiria a cualquiera crear tickets.
+   */
+  RESEND_WEBHOOK_SECRET: z.string().trim().optional(),
+
+  /**
+   * Carpeta donde se guardan los ficheros subidos (fotos de perfil).
+   *
+   * En Docker debe apuntar a un volumen: dentro de la imagen se perderia en
+   * cada despliegue.
+   */
+  UPLOADS_DIR: z.string().trim().default('uploads'),
 });
 
 export type Env = z.infer<typeof envSchema>;

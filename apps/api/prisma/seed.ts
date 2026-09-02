@@ -14,8 +14,8 @@
  *     inicial derivada de los servicios que presta CONIT.
  *
  *  3. DATOS DE DEMOSTRACION (solo con SEED_DEMO_DATA=true) — clientes,
- *     servicios y tickets ficticios para poder evaluar el panel. Desactivado
- *     por defecto para que nunca acaben en un despliegue real.
+ *     servicios, tickets y articulos ficticios para poder evaluar el panel.
+ *     Desactivado por defecto para que nunca acaben en un despliegue real.
  *
  * Variables:
  *   ADMIN_NAME / ADMIN_EMAIL / ADMIN_PASSWORD      (obligatorias)
@@ -38,6 +38,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/client';
+import { DEMO_ARTICLES } from './seed-articles';
 
 const ARGON2_OPTIONS = {
   memoryCost: 19_456,
@@ -139,6 +140,44 @@ async function upsertUser(credentials: UserCredentials): Promise<string> {
   console.log(`  OK  ${label}: ${user.name} <${user.email}>  [${user.role}]`);
 
   return user.id;
+}
+
+/**
+ * Garantiza que una cuenta CLIENT tenga la ficha que el portal necesita.
+ *
+ * La cuenta y la ficha son entidades distintas porque no todos los clientes
+ * reciben acceso al sistema. Cuando las credenciales CLIENT_* si existen, el
+ * seed debe crear tambien el enlace; sembrar solo el usuario deja una cuenta
+ * que puede iniciar sesion pero recibe 403 en todo el portal.
+ */
+async function ensureClientProfile(credentials: UserCredentials, userId: string): Promise<void> {
+  const linked = await prisma.client.findUnique({ where: { userId } });
+
+  if (linked) {
+    console.log(`  OK  Portal vinculado a la ficha: ${linked.name}`);
+    return;
+  }
+
+  const existing = await prisma.client.findFirst({
+    where: { email: credentials.email, userId: null },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const profile = existing
+    ? await prisma.client.update({
+        where: { id: existing.id },
+        data: { userId },
+      })
+    : await prisma.client.create({
+        data: {
+          name: credentials.name,
+          contactName: credentials.name,
+          email: credentials.email,
+          userId,
+        },
+      });
+
+  console.log(`  OK  Portal vinculado a la ficha: ${profile.name}`);
 }
 
 /* =============================================================================
@@ -279,19 +318,28 @@ interface DemoTicket {
   client: number;
   project: number;
   category: string;
+  /**
+   * Minutos hasta la primera respuesta.
+   *
+   * Se declara por ticket, y no como desfase fijo, para que el reporte de
+   * cumplimiento tenga algo que medir: unos casos entran dentro del objetivo
+   * de su categoria y otros no. Con todos a cero, el indicador saldria plano
+   * al 100 % y no diria nada.
+   */
+  responseMinutes: number;
 }
 
 const DEMO_TICKETS: DemoTicket[] = [
-  { subject: 'Certificado SSL proximo a vencer', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.CRITICAL, daysAgo: 0, client: 0, project: 1, category: 'hosting-y-dominios' },
-  { subject: 'Correos corporativos no llegan a Gmail', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.HIGH, daysAgo: 0, client: 2, project: 0, category: 'correo-corporativo' },
-  { subject: 'Error 500 al guardar matriculas', status: TicketStatus.IN_REVIEW, priority: TicketPriority.HIGH, daysAgo: 1, client: 1, project: 0, category: 'aula-virtual' },
-  { subject: 'Solicitud de respaldo de base de datos', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 1, client: 0, project: 0, category: 'base-de-datos' },
-  { subject: 'Renovacion de dominio institucional', status: TicketStatus.RESOLVED, priority: TicketPriority.MEDIUM, daysAgo: 3, client: 1, project: 1, category: 'hosting-y-dominios' },
-  { subject: 'Ajuste del formulario de contacto', status: TicketStatus.RESOLVED, priority: TicketPriority.LOW, daysAgo: 4, client: 2, project: 1, category: 'pagina-web' },
-  { subject: 'Lentitud en el catalogo de productos', status: TicketStatus.RESOLVED, priority: TicketPriority.HIGH, daysAgo: 6, client: 0, project: 0, category: 'sistema-web' },
-  { subject: 'Alta de nuevos buzones de correo', status: TicketStatus.CLOSED, priority: TicketPriority.LOW, daysAgo: 9, client: 2, project: 0, category: 'correo-corporativo' },
-  { subject: 'Restauracion de copia de seguridad', status: TicketStatus.RESOLVED, priority: TicketPriority.CRITICAL, daysAgo: 11, client: 0, project: 1, category: 'base-de-datos' },
-  { subject: 'Carga masiva de estudiantes', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 2, client: 1, project: 0, category: 'aula-virtual' },
+  { responseMinutes: 12, subject: 'Certificado SSL proximo a vencer', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.CRITICAL, daysAgo: 0, client: 0, project: 1, category: 'hosting-y-dominios' },
+  { responseMinutes: 35, subject: 'Correos corporativos no llegan a Gmail', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.HIGH, daysAgo: 0, client: 2, project: 0, category: 'correo-corporativo' },
+  { responseMinutes: 95, subject: 'Error 500 al guardar matriculas', status: TicketStatus.IN_REVIEW, priority: TicketPriority.HIGH, daysAgo: 1, client: 1, project: 0, category: 'aula-virtual' },
+  { responseMinutes: 0, subject: 'Solicitud de respaldo de base de datos', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 1, client: 0, project: 0, category: 'base-de-datos' },
+  { responseMinutes: 210, subject: 'Renovacion de dominio institucional', status: TicketStatus.RESOLVED, priority: TicketPriority.MEDIUM, daysAgo: 3, client: 1, project: 1, category: 'hosting-y-dominios' },
+  { responseMinutes: 480, subject: 'Ajuste del formulario de contacto', status: TicketStatus.RESOLVED, priority: TicketPriority.LOW, daysAgo: 4, client: 2, project: 1, category: 'pagina-web' },
+  { responseMinutes: 55, subject: 'Lentitud en el catalogo de productos', status: TicketStatus.RESOLVED, priority: TicketPriority.HIGH, daysAgo: 6, client: 0, project: 0, category: 'sistema-web' },
+  { responseMinutes: 720, subject: 'Alta de nuevos buzones de correo', status: TicketStatus.CLOSED, priority: TicketPriority.LOW, daysAgo: 9, client: 2, project: 0, category: 'correo-corporativo' },
+  { responseMinutes: 18, subject: 'Restauracion de copia de seguridad', status: TicketStatus.RESOLVED, priority: TicketPriority.CRITICAL, daysAgo: 11, client: 0, project: 1, category: 'base-de-datos' },
+  { responseMinutes: 0, subject: 'Carga masiva de estudiantes', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 2, client: 1, project: 0, category: 'aula-virtual' },
 ];
 
 /** Fecha desplazada hacia atras; `days` negativo apunta al futuro. */
@@ -392,7 +440,10 @@ async function seedDemoData(adminId: string): Promise<void> {
         assigneeId: demo.status === TicketStatus.NEW ? null : adminId,
         createdById: adminId,
         createdAt,
-        firstResponseAt: demo.status === TicketStatus.NEW ? null : createdAt,
+        firstResponseAt:
+          demo.status === TicketStatus.NEW
+            ? null
+            : new Date(createdAt.getTime() + demo.responseMinutes * 60_000),
         resolvedAt: isFinished ? finishedAt : null,
         closedAt: demo.status === TicketStatus.CLOSED ? finishedAt : null,
       },
@@ -406,6 +457,43 @@ async function seedDemoData(adminId: string): Promise<void> {
   }
 
   console.log(`  OK  Demostracion: ${clientIds.length} clientes, ${created} tickets nuevos`);
+}
+
+/* =============================================================================
+ * Base de conocimiento de demostracion
+ * ========================================================================== */
+
+async function seedDemoArticles(authorId: string): Promise<void> {
+  const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const categoryBySlug = new Map(categories.map((category) => [category.slug, category.id]));
+
+  let created = 0;
+
+  for (const demo of DEMO_ARTICLES) {
+    const already = await prisma.article.findUnique({
+      where: { slug: demo.slug },
+      select: { id: true },
+    });
+
+    if (already) continue;
+
+    await prisma.article.create({
+      data: {
+        title: demo.title,
+        slug: demo.slug,
+        summary: demo.summary,
+        content: demo.content,
+        categoryId: categoryBySlug.get(demo.category) ?? null,
+        authorId,
+        isPublished: demo.isPublished,
+        tags: demo.tags,
+      },
+    });
+
+    created += 1;
+  }
+
+  console.log(`  OK  Demostracion: ${created} articulos nuevos`);
 }
 
 /* =============================================================================
@@ -428,13 +516,15 @@ async function main(): Promise<void> {
   const client = readCredentials('CLIENT', UserRole.CLIENT, false);
 
   if (client) {
-    await upsertUser(client);
+    const clientId = await upsertUser(client);
+    await ensureClientProfile(client, clientId);
   }
 
   await seedCategories();
 
   if (process.env['SEED_DEMO_DATA'] === 'true') {
     await seedDemoData(adminId);
+    await seedDemoArticles(adminId);
   } else {
     console.log('  --  Datos de demostracion omitidos (SEED_DEMO_DATA no es "true")');
   }

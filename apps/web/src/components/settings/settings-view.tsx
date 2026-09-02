@@ -2,6 +2,9 @@
 
 import { USER_ROLES } from '@conit/types';
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
   Badge,
   Button,
   Card,
@@ -23,15 +26,29 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { EyeIcon, EyeOffIcon, MonitorIcon, MoonIcon, SunIcon } from 'lucide-react';
+import {
+  CameraIcon,
+  EyeIcon,
+  EyeOffIcon,
+  MonitorIcon,
+  MoonIcon,
+  SunIcon,
+  Trash2Icon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { PageHeader } from '@/components/common/page-header';
-import { useChangePassword, useUpdateProfile } from '@/hooks/use-account';
+import {
+  useChangePassword,
+  useRemoveAvatar,
+  useUpdateProfile,
+  useUploadAvatar,
+} from '@/hooks/use-account';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { useSession } from '@/hooks/use-session';
+import { resolveAvatarUrl } from '@/lib/env';
 import { applyApiFieldErrors } from '@/lib/form-errors';
 import { notify } from '@/lib/notify';
 
@@ -101,13 +118,16 @@ function PasswordInput({
  * sistema (correo saliente, integraciones) llegaran cuando existan esos
  * modulos: mostrar controles que no hacen nada seria peor que no mostrarlos.
  */
-export function SettingsView() {
+export function SettingsView({ portal = false }: { portal?: boolean }) {
   const { user, isLoading } = useSession();
   const isHydrated = useIsHydrated();
   const { theme, setTheme } = useTheme();
 
   const profileMutation = useUpdateProfile();
   const passwordMutation = useChangePassword();
+  const uploadAvatar = useUploadAvatar();
+  const removeAvatar = useRemoveAvatar();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const profileForm = useForm<UpdateProfileFormValues>({
     resolver: zodResolver(updateProfileSchema),
@@ -130,6 +150,22 @@ export function SettingsView() {
   const onSubmitProfile = profileForm.handleSubmit((values) => {
     profileMutation.mutate(values.name);
   });
+
+  const onAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (
+      !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) ||
+      file.size > 2 * 1024 * 1024
+    ) {
+      notify.error('Elige una imagen PNG, JPG o WEBP de hasta 2 MB.');
+      return;
+    }
+
+    uploadAvatar.mutate(file);
+  };
 
   const onSubmitPassword = passwordForm.handleSubmit((values) => {
     passwordMutation.mutate(
@@ -155,8 +191,12 @@ export function SettingsView() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Configuracion"
-        description="Datos de tu cuenta, seguridad y preferencias de la interfaz."
+        title={portal ? 'Mi perfil' : 'Configuracion'}
+        description={
+          portal
+            ? 'Gestiona tus datos de acceso y la foto que identifica tu cuenta.'
+            : 'Datos de tu cuenta, seguridad y preferencias de la interfaz.'
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -170,6 +210,50 @@ export function SettingsView() {
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmitProfile} noValidate className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/20 p-4">
+                <Avatar className="size-16">
+                  {user.avatar ? <AvatarImage src={resolveAvatarUrl(user.avatar)} alt="" /> : null}
+                  <AvatarFallback className="text-base">{user.name.slice(0, 2)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Foto de perfil</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    PNG, JPG o WEBP. Maximo 2 MB.
+                  </p>
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={onAvatarChange}
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    loading={uploadAvatar.isPending}
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <CameraIcon />
+                    {user.avatar ? 'Cambiar' : 'Subir foto'}
+                  </Button>
+                  {user.avatar ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      loading={removeAvatar.isPending}
+                      onClick={() => removeAvatar.mutate(undefined)}
+                      aria-label="Eliminar foto de perfil"
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
               <Field label="Nombre" error={profileForm.formState.errors.name?.message} required>
                 {(field) => (
                   <Input
@@ -293,11 +377,7 @@ export function SettingsView() {
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          <div
-            role="radiogroup"
-            aria-label="Tema de la interfaz"
-            className="flex flex-wrap gap-2"
-          >
+          <div role="radiogroup" aria-label="Tema de la interfaz" className="flex flex-wrap gap-2">
             {THEMES.map((option) => {
               const Icon = option.icon;
               // Hasta la hidratacion no se conoce el tema elegido; se evita

@@ -140,9 +140,49 @@ async function request<TData>(path: string, options: RequestOptions = {}): Promi
   return parseResponse<TData>(retried);
 }
 
+/**
+ * Peticion cruda, sin interpretar el cuerpo.
+ *
+ * Necesaria para las descargas: un CSV no viene envuelto en el sobre JSON.
+ * Comparte el reintento con refresco para que exportar con la sesion recien
+ * caducada no falle sin motivo.
+ */
+async function requestRaw(path: string, options: RequestOptions = {}): Promise<Response> {
+  const response = await performRequest(path, options);
+
+  if (response.status !== 401 || options.skipAuthRefresh) {
+    return response;
+  }
+
+  const refreshed = await refreshSession();
+
+  if (!refreshed) {
+    notifySessionExpired();
+
+    return response;
+  }
+
+  return performRequest(path, options);
+}
+
 export const apiClient = {
   get: <TData>(path: string, options?: RequestOptions) =>
     request<TData>(path, { ...options, method: 'GET' }),
+
+  /** Descarga un fichero. Lanza `ApiError` si el servidor responde con error. */
+  async getBlob(path: string, options?: RequestOptions): Promise<Blob> {
+    const response = await requestRaw(path, { ...options, method: 'GET' });
+
+    if (!response.ok) {
+      throw new ApiError(
+        'No se pudo generar el fichero.',
+        API_ERROR_CODES.INTERNAL_SERVER_ERROR,
+        response.status,
+      );
+    }
+
+    return response.blob();
+  },
 
   post: <TData>(path: string, body?: unknown, options?: RequestOptions) =>
     request<TData>(path, { ...options, method: 'POST', body }),

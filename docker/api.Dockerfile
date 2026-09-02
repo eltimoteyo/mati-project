@@ -57,6 +57,7 @@ RUN pnpm --filter @conit/api run build
 # `migrate deploy`, y ts-node para el seed— esta declarado como dependencia de
 # produccion en apps/api/package.json, no como devDependency.
 RUN pnpm deploy --legacy --prod --filter=@conit/api /prod/api
+RUN test -f /prod/api/scripts/seed-production.cjs
 
 # -----------------------------------------------------------------------------
 # 3) Ejecucion
@@ -87,4 +88,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 #
 # En despliegues con varias replicas, ejecuta `prisma migrate deploy` como paso
 # previo del pipeline y deja aqui solo `node dist/main.js`.
-CMD ["sh", "-c", "prisma migrate deploy && exec node dist/main.js"]
+CMD ["sh", "-c", "prisma migrate deploy && node scripts/seed-production.cjs && exec node dist/main.js"]

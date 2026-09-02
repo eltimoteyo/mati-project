@@ -1,0 +1,33 @@
+# =============================================================================
+# CONIT SUPPORT — Sobrecarga de produccion
+# -----------------------------------------------------------------------------
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Se aplica SOBRE `docker-compose.yml` y cambia lo justo para un servidor
+# expuesto a internet:
+#
+#   - Reinicio `always`, para que el sistema vuelva solo tras reiniciar el VPS.
+#   - Swagger apagado: publicar el esquema completo de la API documenta la
+#     superficie de ataque y no aporta nada en produccion.
+#   - Cookies solo por conexion segura.
+#
+# Los puertos ya se publican unicamente en 127.0.0.1 desde el fichero base, de
+# modo que el proxy inverso es la unica puerta de entrada sin necesidad de
+# redefinirlos aqui.
+#
+# Las variables se leen del `.env` de la raiz. Usa `.env.production.example`
+# como plantilla.
+# =============================================================================
+
+services:
+  postgres:
+    restart: always
+
+  api:
+    restart: always
+    environment:
+      SWAGGER_ENABLED: 'false'
+      COOKIE_SECURE: 'true'
+
+  web:
+    restart: always

@@ -15,10 +15,11 @@ import {
   getInitials,
   Skeleton,
 } from '@conit/ui';
-import { LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react';
+import { GlobeIcon, LogOutIcon, SettingsIcon, UserIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { useLogout } from '@/hooks/use-logout';
+import { resolveAvatarUrl } from '@/lib/env';
 
 const ROLE_LABEL: Record<string, string> = {
   [USER_ROLES.ADMIN]: 'Administrador',
@@ -57,7 +58,7 @@ export function UserMenu({ user }: UserMenuProps) {
         aria-label={`Cuenta de ${user.name}`}
       >
         <Avatar>
-          {user.avatar ? <AvatarImage src={user.avatar} alt="" /> : null}
+          {user.avatar ? <AvatarImage src={resolveAvatarUrl(user.avatar)} alt="" /> : null}
           <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
         </Avatar>
 
@@ -81,6 +82,12 @@ export function UserMenu({ user }: UserMenuProps) {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <Link href="/">
+              <GlobeIcon />
+              Ver sitio web
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/admin/configuracion">
               <UserIcon />

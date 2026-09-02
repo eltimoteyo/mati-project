@@ -1,4 +1,4 @@
-import type { UserRef } from './ticket';
+import type { UserRef } from './user';
 
 /**
  * Mensaje dentro de la conversacion de un ticket.
@@ -7,6 +7,27 @@ import type { UserRef } from './ticket';
  * evita que el historial de cambios se llene de texto libre y permite que la
  * conversacion se muestre como tal, con su propio hilo y su propia visibilidad.
  */
+
+/**
+ * De donde salio el mensaje.
+ *
+ * Permite que el hilo distinga lo que escribio soporte de lo que llego del
+ * cliente sin depender de si este tiene cuenta: un correo entrante no trae
+ * autor, y sin este dato se mostraria igual que un mensaje del sistema.
+ */
+export const MESSAGE_SOURCES = {
+  PANEL: 'PANEL',
+  EMAIL: 'EMAIL',
+  PORTAL: 'PORTAL',
+} as const;
+
+export type MessageSource = (typeof MESSAGE_SOURCES)[keyof typeof MESSAGE_SOURCES];
+
+export const MESSAGE_SOURCE_LABELS: Record<MessageSource, string> = {
+  PANEL: 'Panel',
+  EMAIL: 'Por correo',
+  PORTAL: 'Portal del cliente',
+};
 
 export const MESSAGE_VISIBILITIES = {
   /** Visible para el cliente en el portal (cuando exista). */
@@ -28,6 +49,7 @@ export interface Message {
   ticketId: string;
   body: string;
   visibility: MessageVisibility;
+  source: MessageSource;
   /** Autor; `null` si la cuenta se elimino despues. */
   author: UserRef | null;
   /**

@@ -41,6 +41,7 @@ import {
 import { useSession } from '@/hooks/use-session';
 import { useTicket, useUpdateTicket } from '@/hooks/use-tickets';
 
+import { TicketAssistant } from './ticket-assistant';
 import { TicketConversation } from './ticket-conversation';
 import { TicketFormDialog } from './ticket-form-dialog';
 import { TicketTimeline } from './ticket-timeline';
@@ -68,6 +69,10 @@ export function TicketDetailView({ code }: { code: string }) {
   const { user } = useSession();
   const updateMutation = useUpdateTicket();
   const [editOpen, setEditOpen] = useState(false);
+
+  // Borrador sugerido por el asistente. El identificador cambia en cada
+  // sugerencia para que dos borradores identicos seguidos se vuelquen igual.
+  const [draft, setDraft] = useState<{ id: number; body: string } | null>(null);
 
   if (query.isPending) {
     return <PageLoader message="Cargando ticket…" />;
@@ -150,9 +155,15 @@ export function TicketDetailView({ code }: { code: string }) {
                 idOrCode={ticket.id}
                 messages={ticket.messages}
                 currentUser={user}
+                draft={draft}
               />
             </CardContent>
           </Card>
+
+          <TicketAssistant
+            ticket={ticket}
+            onDraftReply={(body) => setDraft({ id: Date.now(), body })}
+          />
 
           <Card>
             <CardHeader className="flex-col items-start gap-1">

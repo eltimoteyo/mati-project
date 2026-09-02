@@ -8,6 +8,16 @@ export const accountService = {
     return apiClient.patch<PublicUser>('/users/me', { name });
   },
 
+  uploadAvatar(file: File): Promise<PublicUser> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<PublicUser>('/users/me/avatar', formData);
+  },
+
+  removeAvatar(): Promise<PublicUser> {
+    return apiClient.delete<PublicUser>('/users/me/avatar');
+  },
+
   /**
    * Cambia la contrasena. `skipAuthRefresh` evita que un 401 por contrasena
    * actual incorrecta se confunda con una sesion caducada y dispare un

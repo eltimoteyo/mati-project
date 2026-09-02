@@ -1,6 +1,8 @@
 import {
   type Message,
+  MESSAGE_SOURCES,
   MESSAGE_VISIBILITIES,
+  type MessageSource,
   type MessageVisibility,
   type UserRef,
 } from '@conit/types';
@@ -57,6 +59,12 @@ export class MessageResponseDto implements Message {
 
   @ApiProperty({ enum: Object.values(MESSAGE_VISIBILITIES) })
   visibility!: MessageVisibility;
+
+  @ApiProperty({
+    enum: Object.values(MESSAGE_SOURCES),
+    description: 'Si lo escribio soporte, llego por correo o vino del portal.',
+  })
+  source!: MessageSource;
 
   @ApiPropertyOptional({ type: UserRefDto, nullable: true })
   author!: UserRef | null;

@@ -1,6 +1,7 @@
 import {
   canTransition,
   formatTicketCode,
+  NOTIFICATION_TYPES,
   OPEN_TICKET_STATUSES,
   type PaginatedData,
   type Ticket as TicketContract,
@@ -27,6 +28,8 @@ import {
 } from '../common/dto/pagination.dto';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma, type Ticket } from '../generated/prisma/client';
+import { TicketMailService } from '../mail/ticket-mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { CreateTicketDto } from './dto/create-ticket.dto';
 import type { TicketQueryDto } from './dto/ticket-query.dto';
 import type { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -50,7 +53,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+    private readonly ticketMail: TicketMailService,
+  ) {}
 
   /* ---------------------------------------------------------------------------
    * Lectura
@@ -140,11 +147,17 @@ export class TicketsService {
       }
 
       await this.writeEvents(tx, ticket.id, actorId, events);
+      await this.notifyOnCreate(tx, ticket, actorId);
 
       return ticket;
     });
 
     this.logger.log(`Ticket ${formatTicketCode(created.number)} creado por ${actorId}`);
+
+    // El correo se envia despues de confirmar la transaccion: avisar de un
+    // ticket que luego se revierte seria peor que no avisar. `MailService`
+    // nunca lanza, asi que esperar aqui no puede tumbar el alta.
+    await this.ticketMail.sendTicketCreated(created.id);
 
     return this.findOne(created.id);
   }
@@ -239,7 +252,15 @@ export class TicketsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.ticket.update({ where: { id: current.id }, data });
       await this.writeEvents(tx, current.id, actorId, events);
+      await this.notifyOnUpdate(tx, current, dto, actorId);
     });
+
+    // Solo la resolucion se comunica al cliente. Los estados intermedios son
+    // informacion de proceso: enviarlos convertiria su buzon en un registro de
+    // auditoria y acabaria en la carpeta de correo no deseado.
+    if (dto.status === 'RESOLVED' && current.status !== 'RESOLVED') {
+      await this.ticketMail.sendTicketResolved(current.id);
+    }
 
     return this.findOne(current.id);
   }
@@ -378,6 +399,106 @@ export class TicketsService {
     }
 
     return data;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Avisos
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * Avisos derivados de un alta.
+   *
+   * Se emiten dentro de la transaccion del ticket: si el alta se revierte, el
+   * aviso no queda colgado apuntando a un ticket que nunca existio.
+   */
+  private async notifyOnCreate(
+    tx: Prisma.TransactionClient,
+    ticket: Ticket,
+    actorId: string,
+  ): Promise<void> {
+    const label = NotificationsService.ticketLabel(ticket.number, ticket.subject);
+
+    // Nadie necesita que le avisen de lo que acaba de hacer.
+    if (ticket.assigneeId && ticket.assigneeId !== actorId) {
+      await this.notifications.notify(
+        {
+          userId: ticket.assigneeId,
+          type: NOTIFICATION_TYPES.TICKET_ASSIGNED,
+          title: 'Se te ha asignado un ticket',
+          body: label,
+          ticketId: ticket.id,
+        },
+        tx,
+      );
+
+      return;
+    }
+
+    // Una incidencia critica que entra sin responsable no puede quedarse
+    // esperando a que alguien mire la bandeja: se avisa a todo el equipo.
+    if (ticket.priority === 'CRITICAL' && !ticket.assigneeId) {
+      const admins = await tx.user.findMany({
+        where: { role: 'ADMIN', status: 'ACTIVE', id: { not: actorId } },
+        select: { id: true },
+      });
+
+      for (const admin of admins) {
+        await this.notifications.notify(
+          {
+            userId: admin.id,
+            type: NOTIFICATION_TYPES.TICKET_CRITICAL,
+            title: 'Incidencia critica sin responsable',
+            body: label,
+            ticketId: ticket.id,
+          },
+          tx,
+        );
+      }
+    }
+  }
+
+  /** Avisos derivados de una edicion: reasignacion y cambio de estado. */
+  private async notifyOnUpdate(
+    tx: Prisma.TransactionClient,
+    current: Ticket,
+    dto: UpdateTicketDto,
+    actorId: string,
+  ): Promise<void> {
+    const label = NotificationsService.ticketLabel(current.number, dto.subject ?? current.subject);
+
+    const assigneeChanged = dto.assigneeId !== undefined && dto.assigneeId !== current.assigneeId;
+
+    if (assigneeChanged && dto.assigneeId && dto.assigneeId !== actorId) {
+      await this.notifications.notify(
+        {
+          userId: dto.assigneeId,
+          type: NOTIFICATION_TYPES.TICKET_ASSIGNED,
+          title: 'Se te ha asignado un ticket',
+          body: label,
+          ticketId: current.id,
+        },
+        tx,
+      );
+    }
+
+    if (dto.status && dto.status !== current.status) {
+      // Quien recibe el aviso es el responsable resultante, que puede ser el
+      // recien asignado en esta misma edicion.
+      const recipient = assigneeChanged ? dto.assigneeId : current.assigneeId;
+
+      if (recipient && recipient !== actorId) {
+        await this.notifications.notify(
+          {
+            userId: recipient,
+            type: NOTIFICATION_TYPES.TICKET_STATUS_CHANGED,
+            title: `Ticket ahora en "${TICKET_STATUS_LABELS[dto.status]}"`,
+            body: label,
+            ticketId: current.id,
+          },
+          tx,
+        );
+      }
+    }
   }
 
   /** Escribe el historial dentro de la misma transaccion que el cambio. */

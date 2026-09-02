@@ -49,6 +49,13 @@ interface TicketConversationProps {
   messages: Message[];
   /** Usuario actual: determina qué mensajes puede editar. */
   currentUser: UserRef | { id: string } | undefined;
+  /**
+   * Borrador propuesto por el asistente.
+   *
+   * Cambia de identidad en cada sugerencia (no solo de texto) para que dos
+   * borradores iguales seguidos sigan volcandose en el editor.
+   */
+  draft?: { id: number; body: string } | null;
 }
 
 /** Burbuja de un mensaje. */
@@ -145,7 +152,12 @@ function MessageBubble({
  * Tenerlos juntos —y distinguidos visualmente— refleja como se trabaja en
  * realidad, en lugar de obligar a saltar entre dos pestanas.
  */
-export function TicketConversation({ idOrCode, messages, currentUser }: TicketConversationProps) {
+export function TicketConversation({
+  idOrCode,
+  messages,
+  currentUser,
+  draft,
+}: TicketConversationProps) {
   const [visibility, setVisibility] = useState<MessageVisibility>(MESSAGE_VISIBILITIES.PUBLIC);
   const [editing, setEditing] = useState<Message | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -159,6 +171,7 @@ export function TicketConversation({ idOrCode, messages, currentUser }: TicketCo
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
     // Entrada y salida difieren: `visibility` es opcional al escribir y
     // obligatoria tras aplicar el valor por defecto del esquema.
@@ -166,6 +179,15 @@ export function TicketConversation({ idOrCode, messages, currentUser }: TicketCo
     resolver: zodResolver(createMessageSchema),
     defaultValues: { body: '', visibility: MESSAGE_VISIBILITIES.PUBLIC },
   });
+
+  // Vuelca el borrador en el editor sin pisar lo que el agente este
+  // escribiendo: solo se aplica cuando llega uno nuevo.
+  const [appliedDraftId, setAppliedDraftId] = useState<number | null>(null);
+
+  if (draft && draft.id !== appliedDraftId) {
+    setAppliedDraftId(draft.id);
+    setValue('body', draft.body, { shouldValidate: true });
+  }
 
   const onSubmit = handleSubmit((values) => {
     sendMutation.mutate(

@@ -49,7 +49,13 @@ function buildValidationException(errors: ValidationError[]): BadRequestExceptio
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: false,
+    // Conserva el cuerpo sin parsear de cada peticion. Lo necesita el webhook
+    // de correo entrante: la firma se calcula sobre los bytes exactos, y
+    // volver a serializar el objeto la invalidaria.
+    rawBody: true,
+  });
   const configService = app.get(ConfigService<AppConfig, true>);
 
   const port = configService.get('port', { infer: true });
@@ -60,6 +66,25 @@ async function bootstrap(): Promise<void> {
   // Detras de Nginx o Traefik, `req.ip` debe reflejar la IP real del cliente:
   // de ello depende que el rate limiting cuente por usuario y no por proxy.
   app.set('trust proxy', 1);
+
+  /*
+   * Ficheros subidos (fotos de perfil).
+   *
+   * Se sirven fuera del prefijo de la API porque son recursos estaticos, no
+   * endpoints. `index: false` evita listar el directorio, y las cabeceras
+   * fuerzan que el navegador los trate como datos: sin `nosniff`, un fichero
+   * manipulado podria intentar ejecutarse como script en el dominio.
+   */
+  app.useStaticAssets(configService.get('uploads', { infer: true }).dir, {
+    prefix: '/uploads/',
+    index: false,
+    dotfiles: 'deny',
+    setHeaders: (response) => {
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      response.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'");
+      response.setHeader('Cache-Control', 'public, max-age=86400');
+    },
+  });
 
   app.use(
     helmet({
@@ -83,7 +108,29 @@ async function bootstrap(): Promise<void> {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: cors.origins,
+    origin: (origin, callback) => {
+      // Permite peticiones sin origin (curl, server-to-server, scripts, webhooks)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Origenes explicitamente configurados
+      if (cors.origins.includes(origin) || cors.origins.includes('*')) {
+        return callback(null, true);
+      }
+
+      // Permite automaticamente dominios de produccion y preview de Vercel (*.vercel.app)
+      if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin)) {
+        return callback(null, true);
+      }
+
+      // En desarrollo permite cualquier puerto de localhost
+      if (!isProduction && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      callback(null, false);
+    },
     // Imprescindible para que el navegador envie las cookies de sesion.
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],

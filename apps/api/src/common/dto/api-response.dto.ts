@@ -49,6 +49,8 @@ export class ApiErrorDto {
 interface EnvelopeOptions {
   status?: number;
   description?: string;
+  /** El endpoint devuelve una coleccion del modelo en lugar de un solo objeto. */
+  isArray?: boolean;
 }
 
 /**
@@ -59,18 +61,19 @@ interface EnvelopeOptions {
  */
 export function ApiEnvelopeResponse<TModel extends Type<unknown>>(
   model: TModel,
-  { status = 200, description = 'Operacion correcta' }: EnvelopeOptions = {},
+  { status = 200, description = 'Operacion correcta', isArray = false }: EnvelopeOptions = {},
 ) {
+  const data = isArray
+    ? { type: 'array', items: { $ref: getSchemaPath(model) } }
+    : { $ref: getSchemaPath(model) };
+
   return applyDecorators(
     ApiExtraModels(ApiSuccessDto, model),
     ApiResponse({
       status,
       description,
       schema: {
-        allOf: [
-          { $ref: getSchemaPath(ApiSuccessDto) },
-          { properties: { data: { $ref: getSchemaPath(model) } } },
-        ],
+        allOf: [{ $ref: getSchemaPath(ApiSuccessDto) }, { properties: { data } }],
       },
     }),
   );

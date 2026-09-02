@@ -26,7 +26,9 @@ import { ClientsService } from './clients.service';
 import { ClientQueryDto } from './dto/client-query.dto';
 import { ClientResponseDto } from './dto/client-response.dto';
 import { CreateClientDto } from './dto/create-client.dto';
+import { GrantPortalAccessDto } from './dto/portal-access.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { type PortalAccess, PortalAccessService } from './portal-access.service';
 
 /** Referencia usada por los selectores de formulario. */
 export class ClientRefDto implements ClientRef {
@@ -42,7 +44,10 @@ export class ClientRefDto implements ClientRef {
 @Roles(USER_ROLES.ADMIN)
 @Controller('clients')
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
+  constructor(
+    private readonly clientsService: ClientsService,
+    private readonly portalAccessService: PortalAccessService,
+  ) {}
 
   @Get()
   @ResponseMessage('Clientes obtenidos correctamente')
@@ -113,5 +118,64 @@ export class ClientsController {
     await this.clientsService.remove(id);
 
     return null;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Acceso al portal
+   * ------------------------------------------------------------------------ */
+
+  @Get(':id/portal-access')
+  @ResponseMessage('Acceso al portal obtenido correctamente')
+  @ApiOperation({
+    summary: 'Estado del acceso al portal',
+    description: 'Indica si el cliente tiene cuenta para entrar a ver sus incidencias.',
+  })
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, 'El cliente no existe.')
+  getPortalAccess(@Param('id', ParseUUIDPipe) id: string): Promise<PortalAccess> {
+    return this.portalAccessService.get(id);
+  }
+
+  @Post(':id/portal-access')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Acceso al portal concedido correctamente')
+  @ApiOperation({
+    summary: 'Conceder acceso al portal',
+    description:
+      'Crea o reactiva la cuenta del cliente con la contrasena indicada. Comunicasela por un canal seguro: no se envia por correo.',
+  })
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, 'El cliente no existe.')
+  @ApiErrorResponse(HttpStatus.CONFLICT, 'Ya existe un usuario con ese correo.')
+  grantPortalAccess(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: GrantPortalAccessDto,
+  ): Promise<PortalAccess> {
+    return this.portalAccessService.grant(id, dto.password, {
+      ...(dto.name ? { name: dto.name } : {}),
+      ...(dto.sendEmail === undefined ? {} : { sendEmail: dto.sendEmail }),
+    });
+  }
+
+  @Post(':id/portal-access/resend')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Credenciales enviadas correctamente')
+  @ApiOperation({
+    summary: 'Restablecer y enviar las credenciales',
+    description:
+      'Genera una contrasena nueva y se la envia al cliente por correo. La anterior deja de funcionar: la actual no se puede reenviar porque solo se guarda su hash.',
+  })
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, 'Este cliente no tiene acceso al portal.')
+  resendPortalCredentials(@Param('id', ParseUUIDPipe) id: string): Promise<PortalAccess> {
+    return this.portalAccessService.resetAndSend(id);
+  }
+
+  @Delete(':id/portal-access')
+  @ResponseMessage('Acceso al portal retirado correctamente')
+  @ApiOperation({
+    summary: 'Retirar el acceso al portal',
+    description: 'Desactiva la cuenta y cierra sus sesiones. No borra lo que haya escrito.',
+  })
+  @ApiErrorResponse(HttpStatus.NOT_FOUND, 'Este cliente no tiene acceso al portal.')
+  revokePortalAccess(@Param('id', ParseUUIDPipe) id: string): Promise<PortalAccess> {
+    return this.portalAccessService.revoke(id);
   }
 }

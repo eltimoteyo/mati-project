@@ -11,5 +11,6 @@ export const siteConfig = {
     home: '/',
     login: '/login',
     dashboard: '/admin',
+    portal: '/portal',
   },
 } as const;

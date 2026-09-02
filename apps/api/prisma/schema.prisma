@@ -63,6 +63,9 @@ model User {
   createdTickets  Ticket[]      @relation("TicketCreatedBy")
   ticketEvents    TicketEvent[]
   messages        Message[]
+  articles        Article[]
+  notifications   Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@index([role, status])
   @@map("users")
@@ -217,6 +220,7 @@ model Category {
   updatedAt             DateTime       @updatedAt @map("updated_at")
 
   tickets Ticket[]
+  articles Article[]
 
   @@index([status])
   @@map("categories")
@@ -275,8 +279,9 @@ model Ticket {
   assignee  User?     @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdBy User?     @relation("TicketCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  events   TicketEvent[]
-  messages Message[]
+  events        TicketEvent[]
+  messages      Message[]
+  notifications Notification[]
 
   @@index([status])
   @@index([priority])
@@ -329,6 +334,17 @@ model TicketEvent {
 // =============================================================================
 
 /// Alcance de un mensaje.
+/// De donde salio el mensaje. Permite distinguir en el hilo lo que escribio
+/// soporte de lo que llego del cliente, sin depender de si tiene o no cuenta.
+enum MessageSource {
+  /// Escrito por soporte desde el panel.
+  PANEL
+  /// Recibido por correo del cliente.
+  EMAIL
+  /// Escrito por el cliente desde su portal.
+  PORTAL
+}
+
 enum MessageVisibility {
   /// Visible para el cliente en el portal.
   PUBLIC
@@ -347,6 +363,7 @@ model Message {
   authorId   String?           @map("author_id") @db.Uuid
   body       String            @db.Text
   visibility MessageVisibility @default(PUBLIC)
+  source     MessageSource     @default(PANEL)
   /// Momento en que el cliente lo leyo; solo aplica a mensajes publicos.
   readAt     DateTime?         @map("read_at")
   /// Marca de edicion; null si nunca se edito.
@@ -360,4 +377,82 @@ model Message {
   @@index([ticketId, createdAt])
   @@index([visibility])
   @@map("messages")
+}
+
+// =============================================================================
+// Base de conocimiento
+// =============================================================================
+
+/// Articulo de ayuda o solucion a incidencias comunes.
+model Article {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(200)
+  /// Identificador amigable en minusculas para URLs limpias.
+  slug        String   @unique @db.VarChar(220)
+  summary     String?  @db.VarChar(500)
+  content     String   @db.Text
+  categoryId  String?  @map("category_id") @db.Uuid
+  authorId    String?  @map("author_id") @db.Uuid
+  isPublished Boolean  @default(true) @map("is_published")
+  viewsCount  Int      @default(0) @map("views_count")
+  tags        String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author   User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@map("articles")
+}
+
+// =============================================================================
+// Notificaciones
+// =============================================================================
+
+enum NotificationType {
+  /// Te han asignado un ticket.
+  TICKET_ASSIGNED
+  /// Ha cambiado el estado de un ticket que llevas.
+  TICKET_STATUS_CHANGED
+  /// Han escrito en la conversacion de un ticket que llevas.
+  TICKET_MESSAGE
+  /// Se ha registrado un ticket critico sin responsable.
+  TICKET_CRITICAL
+}
+
+/// Aviso dirigido a una persona concreta.
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  body      String           @db.VarChar(500)
+  /// Ticket al que se refiere, si lo hay.
+  ticketId  String?          @map("ticket_id") @db.Uuid
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  /// Sirve al listado y al recuento de no leidas, que son las dos consultas.
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+/// Preferencia por tipo de aviso. La ausencia de fila significa "activado".
+model NotificationPreference {
+  id      String           @id @default(uuid()) @db.Uuid
+  userId  String           @map("user_id") @db.Uuid
+  type    NotificationType
+  enabled Boolean          @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
 }

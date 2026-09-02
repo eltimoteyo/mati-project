@@ -1,0 +1,9 @@
+node_modules
+.next
+.turbo
+dist
+.git
+*.tar.gz
+*.zip
+coverage
+.vscode

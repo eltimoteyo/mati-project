@@ -1,17 +1,12 @@
 import type { Metadata } from 'next';
 
-import { ModulePlaceholder } from '@/components/common/module-placeholder';
+import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 
 export const metadata: Metadata = {
   title: 'Base de conocimiento',
+  description: 'Guias, soluciones y procedimientos para resolver incidencias frecuentes.',
 };
 
-const SCOPE = [
-  'Articulos y soluciones para incidencias frecuentes.',
-  'Busqueda y organizacion por categoria.',
-  'Vinculacion de articulos a tickets resueltos.',
-];
-
 export default function BaseConocimientoPage() {
-  return <ModulePlaceholder href="/admin/base-conocimiento" scope={SCOPE} />;
+  return <KnowledgeView />;
 }

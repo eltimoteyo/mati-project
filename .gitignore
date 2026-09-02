@@ -58,3 +58,11 @@ postgres-data/
 tmp/
 temp/
 *.local
+
+# Uploads
+apps/api/uploads/**
+!apps/api/uploads/
+!apps/api/uploads/**/
+!apps/api/uploads/**/.gitkeep
+
+.vercel

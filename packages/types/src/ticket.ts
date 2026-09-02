@@ -3,14 +3,7 @@ import type { CategoryRef } from './category';
 import type { ClientRef } from './client';
 import type { Message } from './message';
 import type { ProjectRef } from './project';
-
-/** Referencia ligera a un usuario, para autores y responsables. */
-export interface UserRef {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string | null;
-}
+import type { UserRef } from './user';
 
 /* -----------------------------------------------------------------------------
  * Estados

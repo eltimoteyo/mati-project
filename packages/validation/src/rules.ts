@@ -45,6 +45,12 @@ export const VALIDATION_RULES = {
     subject: { minLength: 5, maxLength: 200 },
     description: { minLength: 10, maxLength: 10_000 },
   },
+  article: {
+    title: { minLength: 3, maxLength: 200 },
+    slug: { maxLength: 220 },
+    summary: { maxLength: 500 },
+    content: { minLength: 10, maxLength: 50_000 },
+  },
   message: {
     body: { minLength: 1, maxLength: 5000 },
   },

@@ -1,17 +1,12 @@
 import type { Metadata } from 'next';
 
-import { ModulePlaceholder } from '@/components/common/module-placeholder';
+import { NotificationsView } from '@/components/notifications/notifications-view';
 
 export const metadata: Metadata = {
   title: 'Notificaciones',
+  description: 'Avisos sobre tickets y conversaciones, y preferencias de aviso.',
 };
 
-const SCOPE = [
-  'Avisos en la aplicacion y por correo electronico.',
-  'Preferencias por tipo de evento.',
-  'Plantillas de correo corporativo.',
-];
-
 export default function NotificacionesPage() {
-  return <ModulePlaceholder href="/admin/notificaciones" scope={SCOPE} />;
+  return <NotificationsView />;
 }

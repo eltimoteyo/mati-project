@@ -21,7 +21,7 @@ export default function proxy(request: NextRequest) {
 
   const hasSession = request.cookies.has(ACCESS_COOKIE) || request.cookies.has(REFRESH_COOKIE);
 
-  if (pathname.startsWith('/admin') && !hasSession) {
+  if ((pathname.startsWith('/admin') || pathname.startsWith('/portal')) && !hasSession) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = '';
@@ -35,6 +35,9 @@ export default function proxy(request: NextRequest) {
   // token: es el unico que puede sostener una sesion mas alla de 15 minutos.
   // Con la comprobacion laxa, una cookie de acceso caducada rebotaba entre
   // `/login` y `/admin` sin llegar a mostrar ninguna de las dos paginas.
+  // No se puede decidir aqui si va al panel o al portal: el rol vive dentro
+  // del token firmado y comprobarlo exigiria el secreto. Se manda al panel,
+  // que redirige al portal cuando el usuario resulta ser un cliente.
   if (pathname === '/login' && request.cookies.has(REFRESH_COOKIE)) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin';
@@ -47,5 +50,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/login'],
+  matcher: ['/admin/:path*', '/portal/:path*', '/login'],
 };

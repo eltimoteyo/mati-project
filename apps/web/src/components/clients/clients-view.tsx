@@ -19,6 +19,7 @@ import {
 } from '@conit/ui';
 import {
   EllipsisVerticalIcon,
+  KeyRoundIcon,
   PencilIcon,
   PlusIcon,
   TicketIcon,
@@ -36,6 +37,7 @@ import { ActiveStatusBadge } from '@/components/domain/badges';
 import { useClients, useDeleteClient } from '@/hooks/use-clients';
 
 import { ClientFormDialog } from './client-form-dialog';
+import { PortalAccessDialog } from './portal-access-dialog';
 
 const columnHelper = createConitColumnHelper<ClientWithCounts>();
 
@@ -45,6 +47,8 @@ export function ClientsView() {
   const [status, setStatus] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [portalClient, setPortalClient] = useState<ClientWithCounts | null>(null);
   const [editing, setEditing] = useState<ClientWithCounts | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ClientWithCounts | null>(null);
 
@@ -138,6 +142,15 @@ export function ClientsView() {
                       <TicketIcon />
                       Ver sus tickets
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setPortalClient(row.original);
+                      setPortalOpen(true);
+                    }}
+                  >
+                    <KeyRoundIcon />
+                    Acceso al portal
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -233,6 +246,12 @@ export function ClientsView() {
           ) : null}
         </>
       )}
+
+      <PortalAccessDialog
+        open={portalOpen}
+        onOpenChange={setPortalOpen}
+        client={portalClient}
+      />
 
       <ClientFormDialog open={formOpen} onOpenChange={setFormOpen} client={editing} />
 

@@ -12,9 +12,19 @@
         "options": {
           "classValidatorShim": true,
           "introspectComments": true,
-          "dtoFileNameSuffix": [".dto.ts", ".entity.ts"]
+          "dtoFileNameSuffix": [
+            ".dto.ts",
+            ".entity.ts"
+          ]
         }
       }
-    ]
+    ],
+    "assets": [
+      {
+        "include": "mail/assets/**/*",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
   }
 }

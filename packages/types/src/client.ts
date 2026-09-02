@@ -59,3 +59,38 @@ export interface ClientRef {
   id: string;
   name: string;
 }
+
+/* -----------------------------------------------------------------------------
+ * Acceso al portal
+ * -------------------------------------------------------------------------- */
+
+/** Cuenta con la que un cliente entra a su portal. */
+export interface ClientPortalAccess {
+  enabled: boolean;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    status: string;
+    lastLoginAt: string | null;
+  } | null;
+  /**
+   * Resultado del envio de credenciales, cuando se pidio.
+   *
+   * `null` si no se pidio enviarlas. Un envio fallido no anula el acceso: la
+   * cuenta queda operativa aunque el correo no salga.
+   */
+  email: { sent: boolean; reason?: string } | null;
+}
+
+export interface GrantPortalAccessInput {
+  password: string;
+  name?: string;
+  /**
+   * Envia las credenciales por correo.
+   *
+   * Es la unica ocasion de hacerlo: la contrasena solo se guarda hasheada, de
+   * modo que despues no se puede recuperar para reenviarla.
+   */
+  sendEmail?: boolean;
+}

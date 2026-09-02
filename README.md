@@ -85,11 +85,13 @@ El sistema permite al equipo técnico y administradores gestionar clientes, regi
   </tr>
   <tr>
     <td width="50%">
-      <h3>📊 Dashboard y Analítica Ejecutiva</h3>
+      <h3>📊 Dashboard, Reportes y Analítica</h3>
       <ul>
         <li><strong>KPIs en Tiempo Real:</strong> Total de tickets activos, clientes atendidos, servicios en curso y tiempos promedio de respuesta.</li>
         <li><strong>Gráficos Interactivos:</strong> Distribución visual por estado, prioridad y categoría mediante <code>Recharts</code>.</li>
-        <li><strong>Bitácora Reciente:</strong> Feed dinámico de actividad y eventos de tickets en tiempo real.</li>
+        <li><strong>Reportes Operativos:</strong> Volumen por periodo, tiempos medios y <strong>cumplimiento del objetivo de cada categoría</strong>, con desglose por cliente, categoría y responsable.</li>
+        <li><strong>Exportación CSV:</strong> Generada en el servidor sobre el periodo completo, no sobre la página visible.</li>
+        <li><strong>Honestidad en el dato:</strong> Cuando una métrica no se puede medir se devuelve <code>null</code> y la interfaz muestra una raya, nunca un cero inventado.</li>
       </ul>
     </td>
     <td width="50%">
@@ -100,6 +102,28 @@ El sistema permite al equipo técnico y administradores gestionar clientes, regi
         <li><strong>Rotación de Refresh Tokens:</strong> Detección instantánea de reutilización anómala y revocación preventiva de emergencia.</li>
         <li><strong>Argon2id:</strong> Criptografía de contraseñas de vanguardia según recomendaciones OWASP.</li>
         <li><strong>Rate Limiting:</strong> Protección contra ataques de fuerza bruta en endpoints críticos (5 peticiones/minuto en login).</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>💬 Conversaciones y Base de Conocimiento</h3>
+      <ul>
+        <li><strong>Hilo por Ticket:</strong> Mensajes públicos para el cliente y notas internas para el equipo, distinguidos visualmente.</li>
+        <li><strong>Primera Respuesta Real:</strong> Solo un mensaje público la marca; una nota interna no, porque el cliente no la ve.</li>
+        <li><strong>Autoría Protegida:</strong> Cada persona edita y borra únicamente sus propios mensajes.</li>
+        <li><strong>Artículos en Markdown:</strong> Renderizado a nodos de React, sin <code>dangerouslySetInnerHTML</code>: la inyección de HTML es imposible por construcción.</li>
+        <li><strong>Búsqueda y Etiquetas:</strong> Filtrado por categoría, etiqueta y texto libre sobre título, resumen y contenido.</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>🔔 Avisos e Inteligencia Artificial</h3>
+      <ul>
+        <li><strong>Avisos por Evento Real:</strong> Asignación, cambio de estado y nuevos mensajes, emitidos dentro de la transacción que los origina.</li>
+        <li><strong>Sin Ruido Propio:</strong> Nadie recibe un aviso de una acción que acaba de hacer él mismo.</li>
+        <li><strong>Preferencias por Tipo:</strong> Cada usuario elige qué avisos recibe; un fallo al emitir nunca tumba la operación.</li>
+        <li><strong>Asistente Opcional:</strong> Redacta respuestas, sugiere clasificación y resume casos vía OpenRouter. Sin clave configurada se declara no disponible y el resto del sistema funciona igual.</li>
+        <li><strong>Sugerencias, no Decisiones:</strong> La categoría sale del catálogo real y nada se aplica sin que una persona lo confirme.</li>
       </ul>
     </td>
   </tr>
@@ -324,7 +348,9 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-> ℹ️ **Datos de demostración:** Si deseas poblar la base de datos con clientes, proyectos y tickets de ejemplo para pruebas, añade `SEED_DEMO_DATA=true` en `apps/api/.env` antes de ejecutar `pnpm db:seed`.
+> ℹ️ **Datos de demostración:** Para poblar la base con clientes, servicios, tickets y artículos de ejemplo, añade `SEED_DEMO_DATA=true` en `apps/api/.env` antes de ejecutar `pnpm db:seed`. Está desactivado por defecto para que nunca lleguen a un despliegue real.
+>
+> El seed es idempotente y **omite lo que ya existe**. Si cambias los datos de demostración y quieres regenerarlos, retira antes los tickets sembrados con `node scripts/cleanup-test-data.cjs` o `node scripts/reset-demo-tickets.cjs` desde `apps/api/`.
 
 ---
 
@@ -398,7 +424,25 @@ La API cuenta con documentación interactiva **Swagger / OpenAPI** disponible en
 | `GET` / `POST` | `/api/v1/categories` | Admin | Catálogo de categorías, colores y tiempos SLA. |
 | `GET` / `POST` | `/api/v1/tickets` | Admin | Listado avanzado con filtros y registro de tickets. |
 | `GET` / `PATCH` / `DELETE` | `/api/v1/tickets/:idOrCode` | Admin | Consulta por UUID o código (ej. `CNT-0001`), edición y cierre. |
-| `POST` | `/api/v1/tickets/:idOrCode/notes` | Admin | Añade notas técnicas internas al historial. |
+| `GET` / `POST` | `/api/v1/tickets/:idOrCode/messages` | Admin | Conversación del ticket: mensajes públicos y notas internas. |
+| `PATCH` / `DELETE` | `/api/v1/tickets/:idOrCode/messages/:id` | Autor | Edición y borrado, restringidos al autor del mensaje. |
+| `GET` | `/api/v1/users/team` | Admin | Carga de trabajo del equipo de soporte y tickets sin asignar. |
+| `PATCH` | `/api/v1/users/me` | Autenticado | Edición del propio perfil. |
+| `POST` | `/api/v1/auth/change-password` | Sesión activa | Cambia la contraseña y revoca el resto de sesiones. |
+| `GET` | `/api/v1/audit` | Admin | Historial de auditoría con filtros por tipo, autor y fechas. |
+| `GET` | `/api/v1/audit/summary` | Admin | Resumen del historial sobre el mismo filtro que el listado. |
+| `GET` / `POST` | `/api/v1/articles` | Admin | Base de conocimiento: listado con búsqueda y alta de artículos. |
+| `GET` / `PATCH` / `DELETE` | `/api/v1/articles/:idOrSlug` | Admin | Consulta por UUID o slug, edición y borrado. |
+| `POST` | `/api/v1/articles/:idOrSlug/views` | Admin | Registra una lectura (separado de la consulta). |
+| `GET` | `/api/v1/reports` | Admin | Volumen, tiempos medios y cumplimiento de objetivos del periodo. |
+| `GET` | `/api/v1/reports/export` | Admin | Exportación CSV de los tickets del periodo. |
+| `GET` | `/api/v1/notifications` | Autenticado | Avisos del usuario autenticado, con filtros. |
+| `GET` | `/api/v1/notifications/count` | Autenticado | Número de avisos sin leer (indicador de la campana). |
+| `GET` / `PATCH` | `/api/v1/notifications/preferences` | Autenticado | Preferencias por tipo de aviso. |
+| `GET` | `/api/v1/ai/status` | Admin | Disponibilidad del asistente y modelo activo. |
+| `POST` | `/api/v1/ai/tickets/:idOrCode/reply` | Admin | Propone un borrador de respuesta para el cliente. |
+| `POST` | `/api/v1/ai/tickets/:idOrCode/classify` | Admin | Sugiere categoría y prioridad a partir del catálogo real. |
+| `POST` | `/api/v1/ai/tickets/:idOrCode/summary` | Admin | Resume el caso y lista los próximos pasos. |
 
 ### Contrato Estándar de Respuesta
 

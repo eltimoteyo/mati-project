@@ -1,3 +1,5 @@
+import { isAbsolute, resolve } from 'node:path';
+
 import { durationToMs, durationToSeconds } from '../common/utils/duration.util';
 import { type Env, envSchema } from './env.validation';
 
@@ -60,6 +62,42 @@ export function configuration() {
     swagger: {
       enabled: env.SWAGGER_ENABLED,
       path: 'api/docs',
+    },
+
+    ai: {
+      apiKey: env.OPENROUTER_API_KEY,
+      model: env.OPENROUTER_MODEL,
+      fallbackModels: env.OPENROUTER_FALLBACK_MODELS.split(',')
+        .map((model) => model.trim())
+        .filter(Boolean),
+      baseUrl: env.OPENROUTER_BASE_URL,
+      // La disponibilidad se decide aqui una sola vez: los servicios preguntan
+      // por este booleano en lugar de comprobar si hay clave cada vez.
+      enabled: Boolean(env.OPENROUTER_API_KEY),
+    },
+
+    mail: {
+      apiKey: env.RESEND_API_KEY,
+      from: env.MAIL_FROM,
+      replyTo: env.MAIL_REPLY_TO,
+      logoUrl: env.MAIL_LOGO_URL,
+      enabled: env.MAIL_ENABLED && Boolean(env.RESEND_API_KEY),
+      /** Se usa para componer los enlaces del correo. */
+      appUrl: env.FRONTEND_URL,
+      /**
+       * Recepcion de correo. Exige clave de API (para leer el cuerpo) y
+       * secreto de webhook (para comprobar la firma): sin cualquiera de los
+       * dos, el endpoint responde que no esta configurado.
+       */
+      inbound: {
+        webhookSecret: env.RESEND_WEBHOOK_SECRET,
+        enabled: Boolean(env.RESEND_API_KEY) && Boolean(env.RESEND_WEBHOOK_SECRET),
+      },
+    },
+
+    uploads: {
+      /** Ruta absoluta: el proceso puede arrancar desde otro directorio. */
+      dir: isAbsolute(env.UPLOADS_DIR) ? env.UPLOADS_DIR : resolve(process.cwd(), env.UPLOADS_DIR),
     },
   };
 }

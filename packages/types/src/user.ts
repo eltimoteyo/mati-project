@@ -35,6 +35,20 @@ export interface PublicUser {
   updatedAt: string;
 }
 
+/**
+ * Referencia compacta a un usuario para autores y responsables.
+ *
+ * `avatar` es obligatorio y anulable, no opcional: los mapeadores siempre lo
+ * resuelven, y dejarlo opcional obligaria a cada consumidor a distinguir entre
+ * "sin foto" y "no vino en la respuesta", que aqui son lo mismo.
+ */
+export interface UserRef {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+}
+
 /** Payload decodificado de un access token. */
 export interface AccessTokenPayload {
   /** Identificador del usuario (subject). */

@@ -1,17 +1,12 @@
 import type { Metadata } from 'next';
 
-import { ModulePlaceholder } from '@/components/common/module-placeholder';
+import { ReportsView } from '@/components/reports/reports-view';
 
 export const metadata: Metadata = {
   title: 'Reportes',
+  description: 'Volumen de tickets, tiempos de atencion y cumplimiento de objetivos.',
 };
 
-const SCOPE = [
-  'Volumen de tickets por periodo, cliente y servicio.',
-  'Tiempos medios de primera respuesta y de resolucion.',
-  'Exportacion de resultados.',
-];
-
 export default function ReportesPage() {
-  return <ModulePlaceholder href="/admin/reportes" scope={SCOPE} />;
+  return <ReportsView />;
 }

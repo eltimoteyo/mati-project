@@ -1,5 +1,6 @@
-import { CheckIcon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { LoginForm } from '@/components/auth/login-form';
 import { ConitLogo } from '@/components/brand/conit-logo';
@@ -67,7 +68,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       {/* ---------------------------------------------------------------- */}
       {/* Formulario                                                        */}
       {/* ---------------------------------------------------------------- */}
-      <main className="flex items-center justify-center px-6 py-12 sm:px-10">
+      <main className="relative flex items-center justify-center px-6 py-12 sm:px-10">
+        {/* Salida hacia el sitio publico. Va superpuesta y no dentro de la
+            columna para no desplazar el formulario, que va centrado. */}
+        <Link
+          href="/"
+          className="absolute top-6 left-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/22 focus-visible:outline-none sm:top-8 sm:left-8"
+        >
+          <ArrowLeftIcon className="size-4" aria-hidden="true" />
+          Volver a la web
+        </Link>
+
         <div className="w-full max-w-sm animate-rise">
           <div className="mb-9 flex flex-col gap-6">
             <ConitLogo size="md" priority className="lg:hidden" />

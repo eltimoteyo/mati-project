@@ -11,3 +11,25 @@ export const env = {
   appName: process.env.NEXT_PUBLIC_APP_NAME ?? 'CONIT Support',
   isProduction: process.env.NODE_ENV === 'production',
 } as const;
+
+/**
+ * Origen de la API, sin el prefijo de version.
+ *
+ * Los ficheros subidos (fotos de perfil) los sirve la API en `/uploads/...`,
+ * fuera del prefijo `/api/v1`. Sin recortarlo, la imagen se pediria a una ruta
+ * que no existe.
+ */
+export const apiOrigin = env.apiUrl.replace(/\/api\/v\d+\/?$/, '');
+
+/**
+ * URL completa de una foto de perfil.
+ *
+ * Acepta tambien URLs absolutas por si algun dia las imagenes se alojan fuera:
+ * en ese caso se devuelven tal cual.
+ */
+export function resolveAvatarUrl(avatar: string | null | undefined): string | undefined {
+  if (!avatar) return undefined;
+  if (/^https?:\/\//i.test(avatar)) return avatar;
+
+  return `${apiOrigin}${avatar}`;
+}

@@ -27,7 +27,10 @@ services:
       # Acelera el arranque y evita diferencias de collation entre entornos.
       POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      # Se ata a la interfaz local: la base de datos no debe quedar expuesta a
+      # la red por el hecho de levantar el compose. Para alcanzarla desde otra
+      # maquina, hazlo por un tunel SSH.
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       # PostgreSQL 18+ espera el montaje en `/var/lib/postgresql` (no en
       # `.../data`): la imagen coloca los datos en un subdirectorio por version
@@ -74,6 +77,8 @@ services:
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      # Dentro del contenedor siempre la misma ruta; fuera es un volumen.
+      UPLOADS_DIR: /app/uploads
       # Solo se usan al ejecutar `pnpm db:seed` dentro del contenedor.
       ADMIN_NAME: ${ADMIN_NAME:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
@@ -82,7 +87,9 @@ services:
       CLIENT_EMAIL: ${CLIENT_EMAIL:-}
       CLIENT_PASSWORD: ${CLIENT_PASSWORD:-}
     ports:
-      - '${API_PORT:-4000}:4000'
+      # Solo local: en produccion el unico camino desde fuera es el proxy
+      # inverso, y en desarrollo se accede desde la propia maquina.
+      - '127.0.0.1:${API_PORT:-4000}:4000'
     networks:
       - conit
 
@@ -106,13 +113,15 @@ services:
       NODE_ENV: production
       PORT: 3000
     ports:
-      - '${WEB_PORT:-3000}:3000'
+      - '127.0.0.1:${WEB_PORT:-3000}:3000'
     networks:
       - conit
 
 volumes:
   postgres-data:
     name: conit-postgres-data
+  uploads-data:
+    name: conit-uploads-data
 
 networks:
   conit:

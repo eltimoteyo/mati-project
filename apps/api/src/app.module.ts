@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
+import { AiModule } from './ai/ai.module';
+import { ArticlesModule } from './articles/articles.module';
 import { AuditModule } from './audit/audit.module';
 import { AUTH_MESSAGES } from './auth/auth.constants';
 import { AuthModule } from './auth/auth.module';
@@ -17,8 +19,12 @@ import type { AppConfig } from './config/configuration';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
+import { MailModule } from './mail/mail.module';
 import { MessagesModule } from './messages/messages.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PortalModule } from './portal/portal.module';
 import { ProjectsModule } from './projects/projects.module';
+import { ReportsModule } from './reports/reports.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
 
@@ -30,9 +36,8 @@ import { UsersModule } from './users/users.module';
  *   2. `JwtAuthGuard`    — deniega por defecto; `@Public()` es la excepcion.
  *   3. `RolesGuard`      — autoriza por rol una vez conocido el usuario.
  *
- * Los modulos pendientes (notifications, knowledge-base, reports, ai) se
- * anaden a `imports` sin tocar nada mas: nacen protegidos y con el mismo
- * contrato de respuesta.
+ * Todo modulo nuevo se anade a `imports` sin tocar nada mas: nace protegido
+ * y con el mismo contrato de respuesta.
  */
 @Module({
   imports: [
@@ -61,6 +66,12 @@ import { UsersModule } from './users/users.module';
     MessagesModule,
     DashboardModule,
     AuditModule,
+    ArticlesModule,
+    ReportsModule,
+    NotificationsModule,
+    PortalModule,
+    MailModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

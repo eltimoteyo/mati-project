@@ -9,9 +9,8 @@ import { AuthService } from './auth.service';
 import { RefreshFailureFilter } from './filters/refresh-failure.filter';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { SecurityModule } from './security.module';
 import { CookieService } from './services/cookie.service';
-import { PasswordService } from './services/password.service';
-import { SessionService } from './services/session.service';
 import { TokenService } from './services/token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
@@ -27,14 +26,13 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
   imports: [
     PassportModule.register({ defaultStrategy: AUTH_STRATEGIES.jwt, session: false }),
     JwtModule.register({}),
+    SecurityModule,
     UsersModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
-    PasswordService,
     TokenService,
-    SessionService,
     CookieService,
     JwtStrategy,
     JwtRefreshStrategy,

@@ -1,4 +1,5 @@
-import { ScrollArea } from '@conit/ui';
+import { Button, ScrollArea } from '@conit/ui';
+import { GlobeIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { ConitLogo } from '@/components/brand/conit-logo';
@@ -34,6 +35,15 @@ export function SidebarContent({ onNavigate }: SidebarProps) {
       <ScrollArea className="flex-1">
         <SidebarNav onNavigate={onNavigate} />
       </ScrollArea>
+
+      <div className="border-t border-sidebar-border p-4">
+        <Button asChild variant="outline" className="w-full justify-start" onClick={onNavigate}>
+          <Link href={siteConfig.routes.home}>
+            <GlobeIcon />
+            <span>Ver sitio web</span>
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }
