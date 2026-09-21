@@ -5,7 +5,11 @@
     "moduleResolution": "Node",
     "outDir": "./dist",
     "rootDir": "./src",
-    "isolatedModules": false
+    "isolatedModules": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": []
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

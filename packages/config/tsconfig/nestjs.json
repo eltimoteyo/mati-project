@@ -22,5 +22,11 @@
 
     "outDir": "./dist",
     "baseUrl": "./"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "Node"
+    }
   }
 }

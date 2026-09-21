@@ -1,11 +1,15 @@
 {
-  "extends": "@conit/config/tsconfig/base.json",
+  "extends": "@conit/config/tsconfig/nestjs.json",
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
     "outDir": "./dist",
     "rootDir": "./src",
-    "isolatedModules": false
+    "isolatedModules": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": []
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
