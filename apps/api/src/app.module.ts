@@ -27,6 +27,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { ReportsModule } from './reports/reports.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 /**
  * Modulo raiz.
@@ -72,6 +73,7 @@ import { UsersModule } from './users/users.module';
     PortalModule,
     MailModule,
     AiModule,
+    WhatsappModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

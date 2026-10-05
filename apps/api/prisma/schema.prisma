@@ -1,71 +1,38 @@
-// =============================================================================
-// CONIT SUPPORT — Esquema de base de datos
-// -----------------------------------------------------------------------------
-// FASE 1: autenticacion (User, Session).
-// FASE 2: nucleo de tickets (Client, Project, Category, Ticket, TicketEvent).
-//
-// Pendiente de fases posteriores: conversaciones, base de conocimiento,
-// notificaciones, reportes, auditoria general e IA.
-//
-// Prisma 7: la cadena de conexion vive en `prisma.config.ts`, no aqui, y el
-// cliente se genera con el generador `prisma-client` en formato CommonJS para
-// ser compatible con la compilacion de NestJS.
-// =============================================================================
-
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
-  runtime      = "nodejs"
   moduleFormat = "cjs"
+  runtime      = "nodejs"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// =============================================================================
-// Autenticacion
-// =============================================================================
-
-/// Rol funcional del usuario dentro del sistema.
-/// En esta fase el ADMIN es tambien el unico encargado de soporte.
-enum UserRole {
-  ADMIN
-  CLIENT
-}
-
-/// Estado de la cuenta. Solo ACTIVE puede iniciar sesion.
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-}
-
 /// Usuario del sistema (administrador o cliente).
 model User {
-  id           String     @id @default(uuid()) @db.Uuid
-  name         String     @db.VarChar(120)
+  id                      String                   @id @default(uuid()) @db.Uuid
+  name                    String                   @db.VarChar(120)
   /// Normalizado a minusculas antes de persistir.
-  email        String     @unique @db.VarChar(180)
+  email                   String                   @unique @db.VarChar(180)
   /// Hash Argon2id. Nunca se expone en ninguna respuesta de la API.
-  passwordHash String     @map("password_hash")
-  role         UserRole   @default(CLIENT)
-  status       UserStatus @default(ACTIVE)
+  passwordHash            String                   @map("password_hash")
+  role                    UserRole                 @default(CLIENT)
+  status                  UserStatus               @default(ACTIVE)
   /// URL del avatar; null mientras el usuario no cargue uno.
-  avatar       String?    @db.VarChar(500)
-  lastLoginAt  DateTime?  @map("last_login_at")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-
-  sessions       Session[]
-  /// Ficha de cliente asociada, cuando el usuario es de rol CLIENT.
-  clientProfile  Client?
-  assignedTickets Ticket[]      @relation("TicketAssignee")
-  createdTickets  Ticket[]      @relation("TicketCreatedBy")
-  ticketEvents    TicketEvent[]
-  messages        Message[]
-  articles        Article[]
-  notifications   Notification[]
+  avatar                  String?                  @db.VarChar(500)
+  lastLoginAt             DateTime?                @map("last_login_at")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  articles                Article[]
+  clientProfile           Client?
+  messages                Message[]
   notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  sessions                Session[]
+  ticketEvents            TicketEvent[]
+  assignedTickets         Ticket[]                 @relation("TicketAssignee")
+  createdTickets          Ticket[]                 @relation("TicketCreatedBy")
 
   @@index([role, status])
   @@map("users")
@@ -86,21 +53,11 @@ model Session {
   revokedAt  DateTime? @map("revoked_at")
   lastUsedAt DateTime  @default(now()) @map("last_used_at")
   createdAt  DateTime  @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
-}
-
-// =============================================================================
-// Clientes
-// =============================================================================
-
-enum ClientStatus {
-  ACTIVE
-  INACTIVE
 }
 
 /// Empresa o persona que contrata los servicios de CONIT.
@@ -123,21 +80,223 @@ model Client {
   userId      String?      @unique @map("user_id") @db.Uuid
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
-
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  projects Project[]
-  /// `Restrict`: un cliente con incidencias registradas no se elimina, se
-  /// desactiva. Borrarlo destruiria el historial de soporte.
-  tickets  Ticket[]
+  user        User?        @relation(fields: [userId], references: [id])
+  projects    Project[]
+  tickets     Ticket[]
 
   @@index([status])
   @@index([name])
   @@map("clients")
 }
 
-// =============================================================================
-// Proyectos y servicios
-// =============================================================================
+/// Servicio concreto contratado por un cliente.
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  clientId    String        @map("client_id") @db.Uuid
+  name        String        @db.VarChar(160)
+  type        ServiceType
+  description String?       @db.VarChar(2000)
+  /// Dominio o URL del servicio.
+  url         String?       @db.VarChar(300)
+  status      ProjectStatus @default(ACTIVE)
+  startedAt   DateTime?     @map("started_at")
+  /// Vencimiento; relevante sobre todo en hosting y dominios.
+  expiresAt   DateTime?     @map("expires_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([type])
+  @@index([expiresAt])
+  @@map("projects")
+}
+
+/// Clasificacion de incidencias y tiempos objetivo de atencion.
+model Category {
+  id                    String         @id @default(uuid()) @db.Uuid
+  name                  String         @unique @db.VarChar(80)
+  /// Identificador estable en minusculas, util para filtros en la URL.
+  slug                  String         @unique @db.VarChar(80)
+  description           String?        @db.VarChar(300)
+  color                 CategoryColor  @default(NEUTRAL)
+  /// Tiempo objetivo de primera respuesta, en minutos.
+  responseTimeMinutes   Int?           @map("response_time_minutes")
+  /// Tiempo objetivo de resolucion, en minutos.
+  resolutionTimeMinutes Int?           @map("resolution_time_minutes")
+  status                CategoryStatus @default(ACTIVE)
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  articles              Article[]
+  tickets               Ticket[]
+
+  @@index([status])
+  @@map("categories")
+}
+
+/// Incidencia registrada sobre un servicio de un cliente.
+model Ticket {
+  id              String         @id @default(uuid()) @db.Uuid
+  /// Correlativo generado por una secuencia de PostgreSQL. Del deriva el
+  /// codigo visible (`CNT-0042`), que se compone en la capa de presentacion:
+  /// asi la numeracion es atomica y no hay dos tickets con el mismo codigo.
+  number          Int            @unique @default(autoincrement())
+  subject         String         @db.VarChar(200)
+  description     String
+  status          TicketStatus   @default(NEW)
+  priority        TicketPriority @default(MEDIUM)
+  clientId        String         @map("client_id") @db.Uuid
+  projectId       String?        @map("project_id") @db.Uuid
+  categoryId      String?        @map("category_id") @db.Uuid
+  assigneeId      String?        @map("assignee_id") @db.Uuid
+  createdById     String?        @map("created_by_id") @db.Uuid
+  /// Momento de la primera respuesta de soporte; base del indicador de SLA.
+  firstResponseAt DateTime?      @map("first_response_at")
+  resolvedAt      DateTime?      @map("resolved_at")
+  closedAt        DateTime?      @map("closed_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  messages        Message[]
+  notifications   Notification[]
+  events          TicketEvent[]
+  assignee        User?          @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  category        Category?      @relation(fields: [categoryId], references: [id])
+  client          Client         @relation(fields: [clientId], references: [id])
+  createdBy       User?          @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  project         Project?       @relation(fields: [projectId], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@index([clientId])
+  @@index([projectId])
+  @@index([categoryId])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([status, priority])
+  @@map("tickets")
+}
+
+/// Traza inmutable de lo ocurrido en un ticket.
+///
+/// Se escribe siempre en la misma transaccion que el cambio que la origina,
+/// de modo que no puede existir una modificacion sin su registro.
+model TicketEvent {
+  id        String          @id @default(uuid()) @db.Uuid
+  ticketId  String          @map("ticket_id") @db.Uuid
+  actorId   String?         @map("actor_id") @db.Uuid
+  type      TicketEventType
+  /// Valores anterior y nuevo, ya normalizados a texto.
+  fromValue String?         @map("from_value") @db.VarChar(200)
+  toValue   String?         @map("to_value") @db.VarChar(200)
+  /// Texto libre de las notas internas.
+  note      String?         @db.VarChar(2000)
+  createdAt DateTime        @default(now()) @map("created_at")
+  actor     User?           @relation(fields: [actorId], references: [id])
+  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+/// Mensaje de la conversacion de un ticket.
+///
+/// Los mensajes son comunicacion; `TicketEvent` es auditoria. Mantenerlos
+/// separados evita que el historial de cambios se llene de texto libre y
+/// permite mostrar la conversacion como un hilo con su propia visibilidad.
+model Message {
+  id         String            @id @default(uuid()) @db.Uuid
+  ticketId   String            @map("ticket_id") @db.Uuid
+  authorId   String?           @map("author_id") @db.Uuid
+  body       String
+  visibility MessageVisibility @default(PUBLIC)
+  /// Momento en que el cliente lo leyo; solo aplica a mensajes publicos.
+  readAt     DateTime?         @map("read_at")
+  /// Marca de edicion; null si nunca se edito.
+  editedAt   DateTime?         @map("edited_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  source     MessageSource     @default(PANEL)
+  author     User?             @relation(fields: [authorId], references: [id])
+  ticket     Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([visibility])
+  @@map("messages")
+}
+
+/// Articulo de ayuda o solucion a incidencias comunes.
+model Article {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(200)
+  /// Identificador amigable en minusculas para URLs limpias.
+  slug        String    @unique @db.VarChar(220)
+  summary     String?   @db.VarChar(500)
+  content     String
+  categoryId  String?   @map("category_id") @db.Uuid
+  authorId    String?   @map("author_id") @db.Uuid
+  isPublished Boolean   @default(true) @map("is_published")
+  viewsCount  Int       @default(0) @map("views_count")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  author      User?     @relation(fields: [authorId], references: [id])
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@map("articles")
+}
+
+/// Aviso dirigido a una persona concreta.
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  body      String           @db.VarChar(500)
+  /// Ticket al que se refiere, si lo hay.
+  ticketId  String?          @map("ticket_id") @db.Uuid
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  ticket    Ticket?          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+/// Preferencia por tipo de aviso. La ausencia de fila significa "activado".
+model NotificationPreference {
+  id      String           @id @default(uuid()) @db.Uuid
+  userId  String           @map("user_id") @db.Uuid
+  type    NotificationType
+  enabled Boolean          @default(true)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+/// Rol funcional del usuario dentro del sistema.
+/// SYSTEMS es el equipo de sistemas: gestiona tickets generados por la IA.
+enum UserRole {
+  ADMIN
+  CLIENT
+  SYSTEMS
+}
+
+/// Estado de la cuenta. Solo ACTIVE puede iniciar sesion.
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
 
 /// Tipo de servicio prestado por CONIT.
 enum ServiceType {
@@ -157,37 +316,6 @@ enum ProjectStatus {
   ARCHIVED
 }
 
-/// Servicio concreto contratado por un cliente.
-model Project {
-  id          String        @id @default(uuid()) @db.Uuid
-  clientId    String        @map("client_id") @db.Uuid
-  name        String        @db.VarChar(160)
-  type        ServiceType
-  description String?       @db.VarChar(2000)
-  /// Dominio o URL del servicio.
-  url         String?       @db.VarChar(300)
-  status      ProjectStatus @default(ACTIVE)
-  startedAt   DateTime?     @map("started_at")
-  /// Vencimiento; relevante sobre todo en hosting y dominios.
-  expiresAt   DateTime?     @map("expires_at")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-
-  /// El servicio no tiene sentido sin su cliente.
-  client  Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tickets Ticket[]
-
-  @@index([clientId])
-  @@index([status])
-  @@index([type])
-  @@index([expiresAt])
-  @@map("projects")
-}
-
-// =============================================================================
-// Categorias
-// =============================================================================
-
 enum CategoryStatus {
   ACTIVE
   INACTIVE
@@ -202,33 +330,6 @@ enum CategoryColor {
   DANGER
   NEUTRAL
 }
-
-/// Clasificacion de incidencias y tiempos objetivo de atencion.
-model Category {
-  id                    String         @id @default(uuid()) @db.Uuid
-  name                  String         @unique @db.VarChar(80)
-  /// Identificador estable en minusculas, util para filtros en la URL.
-  slug                  String         @unique @db.VarChar(80)
-  description           String?        @db.VarChar(300)
-  color                 CategoryColor  @default(NEUTRAL)
-  /// Tiempo objetivo de primera respuesta, en minutos.
-  responseTimeMinutes   Int?           @map("response_time_minutes")
-  /// Tiempo objetivo de resolucion, en minutos.
-  resolutionTimeMinutes Int?           @map("resolution_time_minutes")
-  status                CategoryStatus @default(ACTIVE)
-  createdAt             DateTime       @default(now()) @map("created_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
-
-  tickets Ticket[]
-  articles Article[]
-
-  @@index([status])
-  @@map("categories")
-}
-
-// =============================================================================
-// Tickets
-// =============================================================================
 
 enum TicketStatus {
   NEW
@@ -245,55 +346,6 @@ enum TicketPriority {
   CRITICAL
 }
 
-/// Incidencia registrada sobre un servicio de un cliente.
-model Ticket {
-  id     String @id @default(uuid()) @db.Uuid
-  /// Correlativo generado por una secuencia de PostgreSQL. Del deriva el
-  /// codigo visible (`CNT-0042`), que se compone en la capa de presentacion:
-  /// asi la numeracion es atomica y no hay dos tickets con el mismo codigo.
-  number Int    @unique @default(autoincrement())
-
-  subject     String         @db.VarChar(200)
-  description String         @db.Text
-  status      TicketStatus   @default(NEW)
-  priority    TicketPriority @default(MEDIUM)
-
-  clientId   String  @map("client_id") @db.Uuid
-  projectId  String? @map("project_id") @db.Uuid
-  categoryId String? @map("category_id") @db.Uuid
-  assigneeId String? @map("assignee_id") @db.Uuid
-  createdById String? @map("created_by_id") @db.Uuid
-
-  /// Momento de la primera respuesta de soporte; base del indicador de SLA.
-  firstResponseAt DateTime? @map("first_response_at")
-  resolvedAt      DateTime? @map("resolved_at")
-  closedAt        DateTime? @map("closed_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  client    Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  /// `SetNull` en las relaciones opcionales: dar de baja un servicio, una
-  /// categoria o un usuario no debe borrar el historial de incidencias.
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  assignee  User?     @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  createdBy User?     @relation("TicketCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-
-  events        TicketEvent[]
-  messages      Message[]
-  notifications Notification[]
-
-  @@index([status])
-  @@index([priority])
-  @@index([clientId])
-  @@index([projectId])
-  @@index([categoryId])
-  @@index([assigneeId])
-  @@index([createdAt])
-  @@index([status, priority])
-  @@map("tickets")
-}
-
 /// Tipo de entrada del historial de un ticket.
 enum TicketEventType {
   CREATED
@@ -306,33 +358,6 @@ enum TicketEventType {
   UPDATED
 }
 
-/// Traza inmutable de lo ocurrido en un ticket.
-///
-/// Se escribe siempre en la misma transaccion que el cambio que la origina,
-/// de modo que no puede existir una modificacion sin su registro.
-model TicketEvent {
-  id        String          @id @default(uuid()) @db.Uuid
-  ticketId  String          @map("ticket_id") @db.Uuid
-  actorId   String?         @map("actor_id") @db.Uuid
-  type      TicketEventType
-  /// Valores anterior y nuevo, ya normalizados a texto.
-  fromValue String?         @map("from_value") @db.VarChar(200)
-  toValue   String?         @map("to_value") @db.VarChar(200)
-  /// Texto libre de las notas internas.
-  note      String?         @db.VarChar(2000)
-  createdAt DateTime        @default(now()) @map("created_at")
-
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([ticketId, createdAt])
-  @@map("ticket_events")
-}
-
-// =============================================================================
-// Conversaciones
-// =============================================================================
-
 /// Alcance de un mensaje.
 /// De donde salio el mensaje. Permite distinguir en el hilo lo que escribio
 /// soporte de lo que llego del cliente, sin depender de si tiene o no cuenta.
@@ -343,6 +368,8 @@ enum MessageSource {
   EMAIL
   /// Escrito por el cliente desde su portal.
   PORTAL
+  /// Recibido por WhatsApp del cliente.
+  WHATSAPP
 }
 
 enum MessageVisibility {
@@ -351,67 +378,6 @@ enum MessageVisibility {
   /// Solo para el equipo de soporte.
   INTERNAL
 }
-
-/// Mensaje de la conversacion de un ticket.
-///
-/// Los mensajes son comunicacion; `TicketEvent` es auditoria. Mantenerlos
-/// separados evita que el historial de cambios se llene de texto libre y
-/// permite mostrar la conversacion como un hilo con su propia visibilidad.
-model Message {
-  id         String            @id @default(uuid()) @db.Uuid
-  ticketId   String            @map("ticket_id") @db.Uuid
-  authorId   String?           @map("author_id") @db.Uuid
-  body       String            @db.Text
-  visibility MessageVisibility @default(PUBLIC)
-  source     MessageSource     @default(PANEL)
-  /// Momento en que el cliente lo leyo; solo aplica a mensajes publicos.
-  readAt     DateTime?         @map("read_at")
-  /// Marca de edicion; null si nunca se edito.
-  editedAt   DateTime?         @map("edited_at")
-  createdAt  DateTime          @default(now()) @map("created_at")
-
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  /// `SetNull`: dar de baja a un usuario no debe borrar lo que escribio.
-  author User?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
-
-  @@index([ticketId, createdAt])
-  @@index([visibility])
-  @@map("messages")
-}
-
-// =============================================================================
-// Base de conocimiento
-// =============================================================================
-
-/// Articulo de ayuda o solucion a incidencias comunes.
-model Article {
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String   @db.VarChar(200)
-  /// Identificador amigable en minusculas para URLs limpias.
-  slug        String   @unique @db.VarChar(220)
-  summary     String?  @db.VarChar(500)
-  content     String   @db.Text
-  categoryId  String?  @map("category_id") @db.Uuid
-  authorId    String?  @map("author_id") @db.Uuid
-  isPublished Boolean  @default(true) @map("is_published")
-  viewsCount  Int      @default(0) @map("views_count")
-  tags        String[] @default([])
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  author   User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
-
-  @@index([categoryId])
-  @@index([authorId])
-  @@index([isPublished])
-  @@index([createdAt])
-  @@map("articles")
-}
-
-// =============================================================================
-// Notificaciones
-// =============================================================================
 
 enum NotificationType {
   /// Te han asignado un ticket.
@@ -422,37 +388,4 @@ enum NotificationType {
   TICKET_MESSAGE
   /// Se ha registrado un ticket critico sin responsable.
   TICKET_CRITICAL
-}
-
-/// Aviso dirigido a una persona concreta.
-model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
-  type      NotificationType
-  title     String           @db.VarChar(200)
-  body      String           @db.VarChar(500)
-  /// Ticket al que se refiere, si lo hay.
-  ticketId  String?          @map("ticket_id") @db.Uuid
-  readAt    DateTime?        @map("read_at")
-  createdAt DateTime         @default(now()) @map("created_at")
-
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  /// Sirve al listado y al recuento de no leidas, que son las dos consultas.
-  @@index([userId, readAt, createdAt])
-  @@map("notifications")
-}
-
-/// Preferencia por tipo de aviso. La ausencia de fila significa "activado".
-model NotificationPreference {
-  id      String           @id @default(uuid()) @db.Uuid
-  userId  String           @map("user_id") @db.Uuid
-  type    NotificationType
-  enabled Boolean          @default(true)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, type])
-  @@map("notification_preferences")
 }

@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Settings,
   Sparkles,
-  Tag,
   Ticket,
   Users,
 } from 'lucide-react';
@@ -77,10 +76,10 @@ export const navigation: NavSection[] = [
           'Webs, sistemas, aulas virtuales, hosting, dominios, correos y bases de datos.',
       },
       {
-        label: 'Categorias',
-        href: '/admin/categorias',
-        icon: Tag,
-        description: 'Clasificacion de incidencias por tipo de servicio.',
+        label: 'IA Soporte',
+        href: '/admin/ia-soporte',
+        icon: Sparkles,
+        description: 'Clasificacion automatica de incidencias por la IA.',
       },
     ],
   },
@@ -94,10 +93,10 @@ export const navigation: NavSection[] = [
         description: 'Asignacion y carga de trabajo del equipo de soporte.',
       },
       {
-        label: 'IA de soporte',
+        label: 'IA Soporte Automática',
         href: '/admin/ia',
         icon: Sparkles,
-        description: 'Respuestas asistidas y clasificacion automatica de tickets.',
+        description: 'Respuestas automáticas y creación inteligente de tickets.',
       },
       {
         label: 'Base de conocimiento',

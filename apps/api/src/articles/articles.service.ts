@@ -1,10 +1,4 @@
-import type {
-  Article,
-  ArticleListItem,
-  ArticleSummary,
-  ArticleTagCount,
-  PaginatedData,
-} from '@conit/types';
+import type { Article, ArticleListItem, ArticleSummary, PaginatedData } from '@conit/types';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { paginate, type PaginationQueryDto, toSkipTake } from '../common/dto/pagination.dto';
@@ -19,15 +13,6 @@ import {
 } from './articles.mapper';
 import type { CreateArticleDto, UpdateArticleDto } from './dto/article.dto';
 import type { ArticleQueryDto } from './dto/article-query.dto';
-
-/** Etiquetas mostradas en el resumen. */
-const TOP_TAGS_LIMIT = 8;
-
-/** Fila de la agregacion de etiquetas. */
-interface TagCountRow {
-  tag: string;
-  count: bigint | number;
-}
 
 /**
  * Base de conocimiento.
@@ -106,7 +91,6 @@ export class ArticlesService {
         content: dto.content,
         categoryId: dto.categoryId ?? null,
         isPublished: dto.isPublished ?? true,
-        tags: this.normalizeTags(dto.tags),
         authorId,
       },
       include: ARTICLE_RELATIONS,
@@ -141,7 +125,6 @@ export class ArticlesService {
         ...(dto.content !== undefined ? { content: dto.content } : {}),
         ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
-        ...(dto.tags !== undefined ? { tags: this.normalizeTags(dto.tags) } : {}),
       },
       include: ARTICLE_RELATIONS,
     });
@@ -162,37 +145,19 @@ export class ArticlesService {
     await this.prisma.article.delete({ where: { id: current.id } });
   }
 
-  /**
-   * Resumen de la base de conocimiento.
-   *
-   * Las etiquetas se agregan en SQL porque estan en una columna de array:
-   * `unnest` las expande a filas para poder contarlas sin traer los articulos.
-   */
+  /** Resumen de la base de conocimiento. */
   async getSummary(): Promise<ArticleSummary> {
-    const [total, published, views, tagRows] = await Promise.all([
+    const [total, published, views] = await Promise.all([
       this.prisma.article.count(),
       this.prisma.article.count({ where: { isPublished: true } }),
       this.prisma.article.aggregate({ _sum: { viewsCount: true } }),
-      this.prisma.$queryRaw<TagCountRow[]>`
-        SELECT tag, COUNT(*) AS count
-        FROM articles, unnest(tags) AS tag
-        GROUP BY tag
-        ORDER BY count DESC, tag ASC
-        LIMIT ${TOP_TAGS_LIMIT}
-      `,
     ]);
-
-    const topTags: ArticleTagCount[] = tagRows.map((row) => ({
-      tag: row.tag,
-      count: Number(row.count),
-    }));
 
     return {
       total,
       published,
       drafts: total - published,
       totalViews: views._sum.viewsCount ?? 0,
-      topTags,
     };
   }
 
@@ -238,29 +203,12 @@ export class ArticlesService {
     return slug;
   }
 
-  /** Minusculas, sin duplicados y sin vacios: las etiquetas se usan para filtrar. */
-  private normalizeTags(tags: string[] | undefined): string[] {
-    if (!tags) return [];
-
-    const seen = new Set<string>();
-
-    for (const tag of tags) {
-      const clean = tag.trim().toLowerCase();
-
-      if (clean) seen.add(clean);
-    }
-
-    return [...seen];
-  }
-
   private buildWhere(query: ArticleQueryDto): Prisma.ArticleWhereInput {
     const term = query.search?.trim();
 
     return {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.isPublished !== undefined ? { isPublished: query.isPublished } : {}),
-      // `has` compara contra un elemento del array, no contra la cadena entera.
-      ...(query.tag ? { tags: { has: query.tag.trim().toLowerCase() } } : {}),
       ...(term
         ? {
             OR: [

@@ -40,10 +40,9 @@ const EMPTY: CreateArticleFormInput = {
   content: '',
   categoryId: '',
   isPublished: true,
-  tags: [],
 };
 
-const KNOWN_FIELDS = ['title', 'slug', 'summary', 'content', 'categoryId', 'tags'] as const;
+const KNOWN_FIELDS = ['title', 'slug', 'summary', 'content', 'categoryId'] as const;
 
 /** Sin categoria: `Select` no admite el valor vacio, hace falta un centinela. */
 const NO_CATEGORY = 'none';
@@ -60,8 +59,8 @@ interface ArticleFormDialogProps {
 /**
  * Alta y edicion de articulos.
  *
- * Las etiquetas se escriben separadas por comas y se normalizan al enviar: es
- * mas rapido que un gestor de fichas y el servidor las deduplica igualmente.
+ * Un solo dialogo cubre ambos casos: los campos son los mismos y mantener dos
+ * formularios paralelos solo garantiza que acaben divergiendo.
  */
 export function ArticleFormDialog({
   open,
@@ -99,7 +98,6 @@ export function ArticleFormDialog({
             content: article.content,
             categoryId: article.category?.id ?? '',
             isPublished: article.isPublished,
-            tags: article.tags,
           }
         : EMPTY,
     );
@@ -114,7 +112,6 @@ export function ArticleFormDialog({
       content: values.content,
       categoryId: values.categoryId ?? null,
       isPublished: values.isPublished,
-      tags: values.tags,
     };
 
     const onError = (error: unknown) => {
@@ -226,35 +223,6 @@ export function ArticleFormDialog({
                 )}
               </Field>
             </div>
-
-            <Field
-              label="Etiquetas"
-              error={errors.tags?.message}
-              hint="Separadas por comas. Maximo 10."
-            >
-              {(field) => (
-                <Controller
-                  control={control}
-                  name="tags"
-                  render={({ field: tags }) => (
-                    <Input
-                      {...field}
-                      value={(tags.value ?? []).join(', ')}
-                      onChange={(event) =>
-                        tags.onChange(
-                          event.target.value
-                            .split(',')
-                            .map((tag) => tag.trim())
-                            .filter(Boolean),
-                        )
-                      }
-                      placeholder="ssl, hosting, dominios"
-                      invalid={Boolean(errors.tags)}
-                    />
-                  )}
-                />
-              )}
-            </Field>
 
             <Field
               label="Contenido"

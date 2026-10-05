@@ -58,6 +58,8 @@ export function AiView() {
 
             {status.isPending ? (
               <Skeleton className="h-6 w-24" />
+            ) : status.isError ? (
+              <Badge variant="warning">Sin verificar</Badge>
             ) : status.data?.enabled ? (
               <Badge variant="success">Disponible</Badge>
             ) : (
@@ -69,6 +71,14 @@ export function AiView() {
         <CardContent className="flex flex-col gap-3">
           {status.isPending ? (
             <Skeleton className="h-5 w-72" />
+          ) : status.isError ? (
+            // Un fallo al consultar el estado no significa que falte la clave:
+            // sin esta distincion se le pide al usuario que configure algo
+            // que puede que ya este bien, y el problema real queda oculto.
+            <p className="text-sm text-muted-foreground">
+              No se pudo consultar el estado del asistente. Recarga la pagina para intentarlo de
+              nuevo; si el problema persiste, revisa que la API este accesible.
+            </p>
           ) : status.data?.enabled ? (
             <p className="text-sm text-muted-foreground">
               Modelo activo:{' '}

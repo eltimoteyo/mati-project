@@ -18,6 +18,7 @@ import {
 } from '@conit/types';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 
+import { AiService } from '../ai/ai.service';
 import { paginate, type PaginationQueryDto, toSkipTake } from '../common/dto/pagination.dto';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
@@ -64,6 +65,7 @@ const STATUS_BY_LABEL = new Map<string, TicketStatus>(
 @Injectable()
 export class PortalService {
   constructor(
+    private readonly aiService: AiService,
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
@@ -232,6 +234,10 @@ export class PortalService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
+      const systems = await tx.user.findFirst({
+        where: { role: 'SYSTEMS', status: 'ACTIVE' },
+        select: { id: true },
+      });
       const ticket = await tx.ticket.create({
         data: {
           subject: dto.subject,
@@ -239,7 +245,7 @@ export class PortalService {
           clientId: client.id,
           projectId: dto.projectId ?? null,
           priority: (dto.priority ?? 'MEDIUM') as TicketPriority,
-          // Lo registra el propio cliente: no hay actor de soporte detras.
+          assigneeId: systems?.id ?? null,
           createdById: userId,
         },
         select: { id: true, number: true },
@@ -257,7 +263,22 @@ export class PortalService {
       return ticket;
     });
 
-    await this.notifySupport(created.id, created.number, dto.subject, 'Nueva incidencia de cliente');
+    const reply = await this.aiService.generatePortalReply(dto.subject, dto.description);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.message.create({
+        data: {
+          ticketId: created.id,
+          body: reply,
+          visibility: MESSAGE_VISIBILITIES.PUBLIC,
+          source: MESSAGE_SOURCES.PANEL,
+        },
+      });
+      await tx.ticket.update({
+        where: { id: created.id },
+        data: { firstResponseAt: new Date() },
+      });
+    });
+    await this.notifySupport(created.id, created.number, dto.subject, 'Nuevo ticket para Sistemas');
 
     return this.findTicket(userId, created.id);
   }
@@ -313,12 +334,22 @@ export class PortalService {
       }
     });
 
-    await this.notifySupport(
-      ticket.id,
-      ticket.number,
-      ticket.subject,
-      'El cliente ha escrito en el portal',
-    );
+    const reply = await this.aiService.generatePortalReply(ticket.subject, dto.body);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.message.create({
+        data: {
+          ticketId: ticket.id,
+          body: reply,
+          visibility: MESSAGE_VISIBILITIES.PUBLIC,
+          source: MESSAGE_SOURCES.PANEL,
+        },
+      });
+      await tx.ticket.updateMany({
+        where: { id: ticket.id, firstResponseAt: null },
+        data: { firstResponseAt: new Date() },
+      });
+    });
+    await this.notifySupport(ticket.id, ticket.number, ticket.subject, 'Nueva respuesta automática de IA');
 
     return this.findTicket(userId, ticket.id);
   }
@@ -460,14 +491,14 @@ export class PortalService {
       return;
     }
 
-    const admins = await this.prisma.user.findMany({
-      where: { role: 'ADMIN', status: 'ACTIVE' },
+    const systems = await this.prisma.user.findMany({
+      where: { role: { in: ['SYSTEMS', 'ADMIN'] }, status: 'ACTIVE' },
       select: { id: true },
     });
 
-    for (const admin of admins) {
+    for (const user of systems) {
       await this.notifications.notify({
-        userId: admin.id,
+        userId: user.id,
         type: NOTIFICATION_TYPES.TICKET_MESSAGE,
         title,
         body,

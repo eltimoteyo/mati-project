@@ -28,7 +28,6 @@ export interface ArticleListItem {
   author: UserRef | null;
   isPublished: boolean;
   viewsCount: number;
-  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -38,20 +37,12 @@ export interface ArticleSummary {
   published: number;
   drafts: number;
   totalViews: number;
-  /** Etiquetas mas usadas, de mayor a menor. */
-  topTags: ArticleTagCount[];
-}
-
-export interface ArticleTagCount {
-  tag: string;
-  count: number;
 }
 
 export interface ArticleFilters {
   search?: string;
   categoryId?: string;
   isPublished?: boolean;
-  tag?: string;
   page?: number;
   pageSize?: number;
   sortBy?: ArticleSortField;
@@ -70,7 +61,6 @@ export interface CreateArticleInput {
   content: string;
   categoryId?: string | null;
   isPublished?: boolean;
-  tags?: string[];
 }
 
 export type UpdateArticleInput = Partial<CreateArticleInput>;

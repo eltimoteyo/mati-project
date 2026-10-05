@@ -17,7 +17,6 @@ export interface DemoArticle {
   content: string;
   /** Slug de la categoria de referencia a la que pertenece. */
   category: string;
-  tags: string[];
   isPublished: boolean;
 }
 
@@ -27,7 +26,6 @@ export const DEMO_ARTICLES: DemoArticle[] = [
     slug: 'renovar-certificado-ssl',
     summary: 'Procedimiento para renovar e instalar el certificado sin cortar el servicio.',
     category: 'hosting-y-dominios',
-    tags: ['ssl', 'hosting', 'certificados'],
     isPublished: true,
     content: `## Cuando aplicar
 
@@ -57,7 +55,6 @@ openssl s_client -connect dominio.com:443 -servername dominio.com < /dev/null | 
     slug: 'correos-corporativos-en-spam',
     summary: 'Revision de SPF, DKIM y DMARC cuando el correo del cliente deja de entregarse.',
     category: 'correo-corporativo',
-    tags: ['correo', 'spf', 'dkim', 'dmarc'],
     isPublished: true,
     content: `## Diagnostico
 
@@ -92,7 +89,6 @@ por completo.
     slug: 'restaurar-copia-de-seguridad',
     summary: 'Restauracion de un respaldo de PostgreSQL sin perder los datos actuales.',
     category: 'base-de-datos',
-    tags: ['base de datos', 'respaldos', 'postgresql'],
     isPublished: true,
     content: `## Antes de empezar
 
@@ -123,7 +119,6 @@ el servicio.`,
     slug: 'error-500-al-guardar-matriculas',
     summary: 'Causas habituales del error al matricular y como aislarlas.',
     category: 'aula-virtual',
-    tags: ['aula virtual', 'errores'],
     isPublished: false,
     content: `## Sintoma
 

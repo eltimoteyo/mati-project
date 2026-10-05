@@ -18,7 +18,7 @@ import {
 } from '@conit/ui';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { BookOpenIcon, EyeIcon, FileTextIcon, PlusIcon, TagIcon } from 'lucide-react';
+import { BookOpenIcon, EyeIcon, FileTextIcon, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -73,24 +73,6 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
         ) : (
           <p className="text-sm text-muted-foreground/70 italic">Sin resumen</p>
         )}
-
-        {article.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {article.tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-md bg-muted px-2 py-0.5 font-mono text-[0.7rem] text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-            {article.tags.length > 4 ? (
-              <span className="text-[0.7rem] text-muted-foreground">
-                +{article.tags.length - 4}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs text-muted-foreground">
           {article.category ? <span>{article.category.name}</span> : null}
@@ -151,11 +133,9 @@ export function KnowledgeView() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [visibility, setVisibility] = useState('all');
-  const [tag, setTag] = useState('');
   const [formOpen, setFormOpen] = useState(false);
 
   const categories = useCategoryOptions();
-  const summary = useArticlesSummary();
 
   const filters = useMemo(
     () => ({
@@ -163,19 +143,17 @@ export function KnowledgeView() {
       search: search || undefined,
       categoryId: categoryId || undefined,
       isPublished: visibility === 'all' ? undefined : visibility === 'true',
-      tag: tag || undefined,
     }),
-    [page, search, categoryId, visibility, tag],
+    [page, search, categoryId, visibility],
   );
 
   const query = useArticles(filters);
-  const hasFilters = search !== '' || categoryId !== '' || visibility !== 'all' || tag !== '';
+  const hasFilters = search !== '' || categoryId !== '' || visibility !== 'all';
 
   const resetFilters = () => {
     setSearch('');
     setCategoryId('');
     setVisibility('all');
-    setTag('');
     setPage(1);
   };
 
@@ -244,36 +222,6 @@ export function KnowledgeView() {
           </SelectContent>
         </Select>
       </DataToolbar>
-
-      {/* Etiquetas mas usadas: filtrar por una es el atajo habitual. */}
-      {(summary.data?.topTags.length ?? 0) > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <TagIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-          {(summary.data?.topTags ?? []).map((entry) => {
-            const isActive = tag === entry.tag;
-
-            return (
-              <button
-                key={entry.tag}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => {
-                  setTag(isActive ? '' : entry.tag);
-                  setPage(1);
-                }}
-                className={
-                  isActive
-                    ? 'rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-[0.7rem] text-primary'
-                    : 'rounded-md border border-border bg-card px-2.5 py-1 font-mono text-[0.7rem] text-muted-foreground transition-colors hover:border-primary/25 hover:text-foreground'
-                }
-              >
-                {entry.tag}
-                <span className="ml-1.5 tabular opacity-60">{entry.count}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
 
       {query.isError ? (
         <ErrorState onRetry={() => void query.refetch()} />

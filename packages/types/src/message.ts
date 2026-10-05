@@ -19,6 +19,7 @@ export const MESSAGE_SOURCES = {
   PANEL: 'PANEL',
   EMAIL: 'EMAIL',
   PORTAL: 'PORTAL',
+  WHATSAPP: 'WHATSAPP',
 } as const;
 
 export type MessageSource = (typeof MESSAGE_SOURCES)[keyof typeof MESSAGE_SOURCES];
@@ -27,6 +28,7 @@ export const MESSAGE_SOURCE_LABELS: Record<MessageSource, string> = {
   PANEL: 'Panel',
   EMAIL: 'Por correo',
   PORTAL: 'Portal del cliente',
+  WHATSAPP: 'WhatsApp',
 };
 
 export const MESSAGE_VISIBILITIES = {

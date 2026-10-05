@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { TicketsModule } from '../tickets/tickets.module';
 import { AiController } from './ai.controller';
@@ -14,7 +14,7 @@ import { OpenRouterProvider } from './providers/openrouter.provider';
  * `AiProvider` deja la puerta abierta a hacerlo cuando haga falta de verdad.
  */
 @Module({
-  imports: [TicketsModule],
+  imports: [forwardRef(() => TicketsModule)],
   controllers: [AiController],
   providers: [OpenRouterProvider, AiService],
   exports: [AiService],

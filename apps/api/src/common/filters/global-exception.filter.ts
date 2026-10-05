@@ -168,10 +168,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     return {
       status,
-      message: status >= HttpStatus.INTERNAL_SERVER_ERROR ? GENERIC_ERROR_MESSAGE : message,
+      message: this.safeMessage(status, message),
       code,
       ...(details ? { details } : {}),
     };
+  }
+
+  /**
+   * Decide que mensaje puede llegar al cliente.
+   *
+   * Un 5xx no controlado nunca muestra su mensaje: ahi suele viajar el detalle
+   * del driver, una ruta o un fragmento de consulta, y eso no se filtra. La
+   * excepcion es el 503, que no describe un fallo sino un **estado**: el
+   * servicio no esta disponible ahora mismo. Quien lo lanza compone el texto
+   * para el usuario y lo deja ya sanitizado, de modo que sustituirlo por un
+   * texto generico solo deja al usuario sin saber que hacer.
+   */
+  private safeMessage(status: number, message: string): string {
+    return status >= HttpStatus.INTERNAL_SERVER_ERROR && status !== HttpStatus.SERVICE_UNAVAILABLE
+      ? GENERIC_ERROR_MESSAGE
+      : message;
   }
 
   /**

@@ -7,6 +7,7 @@
 
 export const USER_ROLES = {
   ADMIN: 'ADMIN',
+  SYSTEMS: 'SYSTEMS',
   CLIENT: 'CLIENT',
 } as const;
 

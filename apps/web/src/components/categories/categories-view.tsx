@@ -56,7 +56,7 @@ export function CategoriesView() {
     () =>
       columnHelper.columns([
         columnHelper.accessor('name', {
-          header: 'Categoria',
+          header: 'Clasificacion',
           cell: (info) => {
             const category = info.row.original;
 
@@ -143,7 +143,7 @@ export function CategoriesView() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Categorias"
+        title="IA Soporte"
         description="Clasificacion de incidencias y tiempos objetivo de atencion."
         actions={
           <Button
@@ -202,16 +202,16 @@ export function CategoriesView() {
             data={query.data?.items ?? []}
             isLoading={query.isPending}
             emptyIcon={TagIcon}
-            emptyTitle={hasFilters ? 'Sin resultados' : 'Aun no hay categorias'}
+            emptyTitle={hasFilters ? 'Sin resultados' : 'Aun no hay clasificaciones'}
             emptyDescription={
               hasFilters
                 ? 'Prueba a cambiar la busqueda o los filtros.'
-                : 'Crea la primera categoria para empezar a clasificar incidencias.'
+                : 'Crea la primera clasificacion para empezar a clasificar incidencias.'
             }
           />
 
           {query.data ? (
-            <Pagination meta={query.data.meta} onPageChange={setPage} itemLabel="categorias" />
+            <Pagination meta={query.data.meta} onPageChange={setPage} itemLabel="clasificaciones" />
           ) : null}
         </>
       )}

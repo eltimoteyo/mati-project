@@ -35,7 +35,7 @@ const ID_OR_CODE = {
  */
 @ApiTags('Conversations')
 @ApiCookieAuth('conit_at')
-@Roles(USER_ROLES.ADMIN)
+@Roles(USER_ROLES.ADMIN, USER_ROLES.SYSTEMS)
 @Controller('tickets/:idOrCode/messages')
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}

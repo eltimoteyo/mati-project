@@ -1,6 +1,8 @@
 import {
   canTransition,
   formatTicketCode,
+  MESSAGE_SOURCES,
+  MESSAGE_VISIBILITIES,
   NOTIFICATION_TYPES,
   OPEN_TICKET_STATUSES,
   type PaginatedData,
@@ -15,11 +17,14 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 
+import { AiService } from '../ai/ai.service';
 import {
   paginate,
   type PaginationQueryDto,
@@ -57,6 +62,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly ticketMail: TicketMailService,
+    @Inject(forwardRef(() => AiService)) private readonly aiService: AiService,
   ) {}
 
   /* ---------------------------------------------------------------------------
@@ -259,6 +265,46 @@ export class TicketsService {
     // informacion de proceso: enviarlos convertiria su buzon en un registro de
     // auditoria y acabaria en la carpeta de correo no deseado.
     if (dto.status === 'RESOLVED' && current.status !== 'RESOLVED') {
+      const resolvedTicket = await this.prisma.ticket.findUnique({
+        where: { id: current.id },
+        select: { subject: true, description: true, categoryId: true },
+      });
+
+      if (resolvedTicket) {
+        const finalReply = await this.aiService.generateResolutionReply(
+          resolvedTicket.subject,
+          resolvedTicket.description,
+        );
+        const article = await this.aiService.generateKnowledgeArticle(
+          resolvedTicket.subject,
+          resolvedTicket.description,
+          finalReply,
+        );
+        const articleSlug = `${article.title.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-').replace(/^-+|-+$/g, '')}-${current.id.slice(0, 8)}`;
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.message.create({
+            data: {
+              ticketId: current.id,
+              body: finalReply,
+              visibility: MESSAGE_VISIBILITIES.PUBLIC,
+              source: MESSAGE_SOURCES.PANEL,
+            },
+          });
+          await tx.article.create({
+            data: {
+              title: article.title,
+              slug: articleSlug,
+              summary: article.summary,
+              content: article.content,
+              categoryId: resolvedTicket.categoryId,
+              authorId: actorId,
+              isPublished: true,
+            },
+          });
+        });
+      }
+
       await this.ticketMail.sendTicketResolved(current.id);
     }
 

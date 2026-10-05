@@ -13,7 +13,7 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from '@conit/types';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import type { AppConfig } from '../config/configuration';
@@ -59,6 +59,7 @@ export class AiService {
   constructor(
     private readonly provider: OpenRouterProvider,
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => TicketsService))
     private readonly ticketsService: TicketsService,
     configService: ConfigService<AppConfig, true>,
   ) {
@@ -75,6 +76,90 @@ export class AiService {
   /* ---------------------------------------------------------------------------
    * Redactar una respuesta
    * ------------------------------------------------------------------------ */
+
+  async generatePortalReply(subject: string, description: string, conversation = ''): Promise<string> {
+    const fallback =
+      'Hemos recibido tu consulta y la hemos enviado al equipo de sistemas. ' +
+      'La revisaremos dentro de este ticket y te informaremos por aquí cuando esté resuelta.';
+
+    if (!this.provider.isAvailable()) return fallback;
+
+    try {
+      const completion = await this.provider.complete([
+        {
+          role: 'system',
+          content: [
+            'Eres la IA de soporte de CONIT.',
+            'Responde en español, de forma clara, breve y profesional.',
+            'Responde la consulta del cliente sin inventar soluciones ni plazos.',
+            'Indica que la solicitud queda registrada para el equipo de sistemas.',
+            'Devuelve únicamente el texto que verá el cliente.',
+          ].join('\\n'),
+        },
+        {
+          role: 'user',
+          content: `Asunto: ${subject}\\n\\nConsulta: ${description}\\n\\nHistorial: ${conversation || 'Sin mensajes previos.'}`,
+        },
+      ], { temperature: 0.25, maxTokens: 350 });
+
+      return completion.content.trim() || fallback;
+    } catch (error) {
+      this.logger.warn(`Respuesta automática no disponible: ${error instanceof Error ? error.message : String(error)}`);
+      return fallback;
+    }
+  }
+
+  async generateResolutionReply(subject: string, description: string): Promise<string> {
+    const fallback = `Ya está resuelto: hemos atendido tu solicitud sobre «${subject}». Si vuelve a ocurrir, puedes escribirnos en este mismo ticket.`;
+
+    if (!this.provider.isAvailable()) return fallback;
+
+    try {
+      const completion = await this.provider.complete([
+        {
+          role: 'system',
+          content: 'Escribe un mensaje breve en español confirmando al cliente que su solicitud ya está resuelta. Devuelve solo el mensaje.',
+        },
+        { role: 'user', content: `Asunto: ${subject}\\nDescripción: ${description}` },
+      ], { temperature: 0.2, maxTokens: 180 });
+
+      return completion.content.trim() || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  async generateKnowledgeArticle(subject: string, description: string, solution: string): Promise<{ title: string; summary: string; content: string }> {
+    const fallback = {
+      title: `Solución: ${subject}`,
+      summary: `Solución aplicada a la incidencia: ${subject}.`,
+      content: `Problema:\n${description}\n\nSolución aplicada:\n${solution}`,
+    };
+
+    if (!this.provider.isAvailable()) return fallback;
+
+    try {
+      const completion = await this.provider.complete([
+        {
+          role: 'system',
+          content: [
+            'Genera un artículo breve de base de conocimiento para soporte técnico.',
+            'Responde únicamente con JSON válido: {"title":"...","summary":"...","content":"..."}.',
+            'Escribe en español y no inventes pasos que no estén en la información recibida.',
+          ].join('\\n'),
+        },
+        { role: 'user', content: `Incidencia: ${subject}\\nDescripción: ${description}\\nSolución: ${solution}` },
+      ], { temperature: 0.2, maxTokens: 700, validate: (content) => this.parseJson(content) !== null });
+      const parsed = this.parseJson<{ title?: unknown; summary?: unknown; content?: unknown }>(completion.content);
+      if (typeof parsed?.title === 'string' && typeof parsed?.summary === 'string' && typeof parsed?.content === 'string') {
+        return { title: parsed.title.trim(), summary: parsed.summary.trim(), content: parsed.content.trim() };
+      }
+    } catch (error) {
+      this.logger.warn(`Artículo automático no disponible: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return fallback;
+  }
 
   async suggestReply(idOrCode: string, dto: SuggestReplyDto): Promise<AiSuggestion> {
     const context = await this.buildContext(idOrCode);

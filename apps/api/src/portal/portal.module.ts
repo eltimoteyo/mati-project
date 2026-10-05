@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AiModule } from '../ai/ai.module';
 import { PortalController } from './portal.controller';
 import { PortalService } from './portal.service';
 
@@ -12,6 +13,7 @@ import { PortalService } from './portal.service';
  * via mas rapida a una fuga de datos.
  */
 @Module({
+  imports: [AiModule],
   controllers: [PortalController],
   providers: [PortalService],
 })

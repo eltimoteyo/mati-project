@@ -25,7 +25,6 @@ export const ARTICLE_LIST_SELECT = {
   summary: true,
   isPublished: true,
   viewsCount: true,
-  tags: true,
   createdAt: true,
   updatedAt: true,
   ...ARTICLE_RELATIONS,
@@ -33,7 +32,7 @@ export const ARTICLE_LIST_SELECT = {
 
 export type ArticleListRecord = Pick<
   ArticleModel,
-  'id' | 'title' | 'slug' | 'summary' | 'isPublished' | 'viewsCount' | 'tags' | 'createdAt' | 'updatedAt'
+  'id' | 'title' | 'slug' | 'summary' | 'isPublished' | 'viewsCount' | 'createdAt' | 'updatedAt'
 > & {
   category: Pick<Category, 'id' | 'name' | 'color'> | null;
   author: UserSelection | null;
@@ -51,7 +50,6 @@ export function toArticleListItem(article: ArticleListRecord): ArticleListItem {
     author: toUserRef(article.author),
     isPublished: article.isPublished,
     viewsCount: article.viewsCount,
-    tags: article.tags,
     createdAt: article.createdAt.toISOString(),
     updatedAt: article.updatedAt.toISOString(),
   };

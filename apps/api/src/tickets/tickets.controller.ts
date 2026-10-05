@@ -37,7 +37,7 @@ const ID_OR_CODE = {
 
 @ApiTags('Tickets')
 @ApiCookieAuth('conit_at')
-@Roles(USER_ROLES.ADMIN)
+@Roles(USER_ROLES.ADMIN, USER_ROLES.SYSTEMS)
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}

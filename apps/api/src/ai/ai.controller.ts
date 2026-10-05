@@ -24,7 +24,7 @@ import {
  */
 @ApiTags('AI')
 @ApiCookieAuth('conit_at')
-@Roles(USER_ROLES.ADMIN)
+@Roles(USER_ROLES.ADMIN, USER_ROLES.SYSTEMS)
 @Controller('ai')
 export class AiController {
   constructor(private readonly aiService: AiService) {}

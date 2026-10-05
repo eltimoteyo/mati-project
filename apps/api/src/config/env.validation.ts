@@ -144,6 +144,17 @@ export const envSchema = z.object({
    */
   RESEND_WEBHOOK_SECRET: z.string().trim().optional(),
 
+  // --- WhatsApp (Twilio) — opcional ------------------------------------------
+  // Se considera listo solo con credenciales, numero remitente y URL publica.
+  TWILIO_ACCOUNT_SID: z.string().trim().optional(),
+  TWILIO_AUTH_TOKEN: z.string().trim().optional(),
+  /** Numero de WhatsApp de CONIT en formato `whatsapp:+...`. */
+  TWILIO_WHATSAPP_NUMBER: z.string().trim().optional(),
+  /** URL publica HTTPS del webhook configurada en Twilio. */
+  WHATSAPP_WEBHOOK_URL: z.string().trim().url().optional(),
+  /** Desactiva el envio sin tener que borrar las credenciales. */
+  WHATSAPP_ENABLED: envBoolean(true),
+
   /**
    * Carpeta donde se guardan los ficheros subidos (fotos de perfil).
    *

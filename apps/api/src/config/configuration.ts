@@ -76,7 +76,7 @@ export function configuration() {
       enabled: Boolean(env.OPENROUTER_API_KEY),
     },
 
-    mail: {
+     mail: {
       apiKey: env.RESEND_API_KEY,
       from: env.MAIL_FROM,
       replyTo: env.MAIL_REPLY_TO,
@@ -93,6 +93,14 @@ export function configuration() {
         webhookSecret: env.RESEND_WEBHOOK_SECRET,
         enabled: Boolean(env.RESEND_API_KEY) && Boolean(env.RESEND_WEBHOOK_SECRET),
       },
+    },
+
+    whatsapp: {
+      accountSid: env.TWILIO_ACCOUNT_SID,
+      authToken: env.TWILIO_AUTH_TOKEN,
+      /** Numero de WhatsApp de CONIT, con prefijo `whatsapp:`. */
+      fromNumber: env.TWILIO_WHATSAPP_NUMBER,
+      enabled: env.WHATSAPP_ENABLED && Boolean(env.TWILIO_ACCOUNT_SID) && Boolean(env.TWILIO_AUTH_TOKEN),
     },
 
     uploads: {

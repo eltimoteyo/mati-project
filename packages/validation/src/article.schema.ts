@@ -32,11 +32,6 @@ export const createArticleSchema = z.object({
   categoryId: optionalUuid,
 
   isPublished: z.boolean().default(true),
-
-  tags: z
-    .array(z.string().trim().min(1).max(50))
-    .max(10, { message: 'Puedes anadir un maximo de 10 etiquetas.' })
-    .default([]),
 });
 
 export const updateArticleSchema = z.object({
@@ -66,11 +61,6 @@ export const updateArticleSchema = z.object({
   categoryId: optionalUuid,
 
   isPublished: z.boolean().optional(),
-
-  tags: z
-    .array(z.string().trim().min(1).max(50))
-    .max(10, { message: 'Puedes anadir un maximo de 10 etiquetas.' })
-    .optional(),
 });
 
 export type CreateArticleFormInput = z.input<typeof createArticleSchema>;

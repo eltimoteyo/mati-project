@@ -92,33 +92,20 @@ export function ArticleDetailView({ slug }: ArticleDetailViewProps) {
           <Badge variant="warning">Borrador</Badge>
         )}
 
-        {article.category ? <span>{article.category.name}</span> : null}
-        {article.author ? <span>Por {article.author.name}</span> : null}
+         {article.category ? <span>{article.category.name}</span> : null}
+         {article.author ? <span>Por {article.author.name}</span> : null}
 
-        <span className="inline-flex items-center gap-1">
-          <EyeIcon className="size-3" aria-hidden="true" />
-          <span className="tabular">{article.viewsCount} lecturas</span>
-        </span>
+         <span className="inline-flex items-center gap-1">
+           <EyeIcon className="size-3" aria-hidden="true" />
+           <span className="tabular">{article.viewsCount} lecturas</span>
+         </span>
 
-        <time dateTime={article.updatedAt} className="tabular">
-          Actualizado el {format(new Date(article.updatedAt), "d 'de' MMMM 'de' yyyy", { locale: es })}
-        </time>
-      </div>
+         <time dateTime={article.updatedAt} className="tabular">
+           Actualizado el {format(new Date(article.updatedAt), "d 'de' MMMM 'de' yyyy", { locale: es })}
+         </time>
+       </div>
 
-      {article.tags.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {article.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md border border-border bg-card px-2.5 py-1 font-mono text-[0.7rem] text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <Separator />
+       <Separator />
 
       <Card>
         <CardContent className="py-6">

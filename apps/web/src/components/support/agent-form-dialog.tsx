@@ -35,7 +35,8 @@ import { applyApiFieldErrors } from '@/lib/form-errors';
 import { notify } from '@/lib/notify';
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: 'Soporte (accede al panel)',
+  ADMIN: 'Administrador (accede al panel)',
+  SYSTEMS: 'Sistemas (solo tickets)',
   CLIENT: 'Cliente (sin acceso al panel)',
 };
 

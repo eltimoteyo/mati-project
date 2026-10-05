@@ -2,7 +2,6 @@ import type {
   Article,
   ArticleListItem,
   ArticleSummary,
-  ArticleTagCount,
   CategoryRef,
   UserRef,
 } from '@conit/types';
@@ -10,8 +9,6 @@ import { VALIDATION_RULES } from '@conit/validation';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  IsArray,
   IsBoolean,
   IsOptional,
   IsString,
@@ -74,14 +71,6 @@ export class CreateArticleDto {
   @IsOptional()
   @IsBoolean()
   isPublished?: boolean;
-
-  @ApiPropertyOptional({ type: [String], maxItems: 10 })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10, { message: 'Puedes anadir un maximo de 10 etiquetas.' })
-  @IsString({ each: true })
-  @MaxLength(50, { each: true })
-  tags?: string[];
 }
 
 /** Todo opcional: la edicion aplica solo lo que llega. */
@@ -131,9 +120,6 @@ export class ArticleListItemDto implements ArticleListItem {
   @ApiProperty({ example: 128 })
   viewsCount!: number;
 
-  @ApiProperty({ type: [String], example: ['ssl', 'hosting'] })
-  tags!: string[];
-
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
 
@@ -144,14 +130,6 @@ export class ArticleListItemDto implements ArticleListItem {
 export class ArticleResponseDto extends ArticleListItemDto implements Article {
   @ApiProperty({ description: 'Cuerpo completo en Markdown.' })
   content!: string;
-}
-
-class ArticleTagCountDto implements ArticleTagCount {
-  @ApiProperty({ example: 'ssl' })
-  tag!: string;
-
-  @ApiProperty({ example: 12 })
-  count!: number;
 }
 
 export class ArticleSummaryDto implements ArticleSummary {
@@ -166,7 +144,4 @@ export class ArticleSummaryDto implements ArticleSummary {
 
   @ApiProperty({ example: 1840 })
   totalViews!: number;
-
-  @ApiProperty({ type: [ArticleTagCountDto] })
-  topTags!: ArticleTagCount[];
 }

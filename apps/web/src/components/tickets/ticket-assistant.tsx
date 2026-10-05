@@ -19,6 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
   Textarea,
 } from '@conit/ui';
 import { CheckIcon, ListChecksIcon, SparklesIcon, TagsIcon, WandSparklesIcon } from 'lucide-react';
@@ -135,6 +136,14 @@ export function TicketAssistant({ ticket, onDraftReply }: TicketAssistantProps) 
   const [instructions, setInstructions] = useState('');
   const [classification, setClassification] = useState<AiClassification | null>(null);
   const [summary, setSummary] = useState<AiSummary | null>(null);
+
+  // El panel solo aparece con un proveedor confirmado. Mientras se consulta se
+  // reserva el sitio para que la tarjeta no salte al paint, y si la consulta
+  // falla se oculta igual: sin saber si hay proveedor, pintar botones que
+  // responderian 503 seria peor que no pintar ninguno.
+  if (status.isPending) {
+    return <Skeleton className="h-40 w-full" />;
+  }
 
   if (!status.data?.enabled) return null;
 

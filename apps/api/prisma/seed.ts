@@ -136,7 +136,11 @@ async function upsertUser(credentials: UserCredentials): Promise<string> {
     },
   });
 
-  const label = credentials.role === UserRole.ADMIN ? 'Administrador' : 'Cliente';
+  const label = credentials.role === UserRole.ADMIN
+    ? 'Administrador'
+    : credentials.role === UserRole.SYSTEMS
+      ? 'Sistemas'
+      : 'Cliente';
   console.log(`  OK  ${label}: ${user.name} <${user.email}>  [${user.role}]`);
 
   return user.id;
@@ -484,10 +488,9 @@ async function seedDemoArticles(authorId: string): Promise<void> {
         summary: demo.summary,
         content: demo.content,
         categoryId: categoryBySlug.get(demo.category) ?? null,
-        authorId,
-        isPublished: demo.isPublished,
-        tags: demo.tags,
-      },
+         authorId,
+         isPublished: demo.isPublished,
+       },
     });
 
     created += 1;
@@ -512,6 +515,12 @@ async function main(): Promise<void> {
   }
 
   const adminId = await upsertUser(admin);
+
+  const systems = readCredentials('SYSTEMS', UserRole.SYSTEMS, false);
+
+  if (systems) {
+    await upsertUser(systems);
+  }
 
   const client = readCredentials('CLIENT', UserRole.CLIENT, false);
 
