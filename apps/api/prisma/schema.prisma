@@ -336,7 +336,7 @@ model WhatsappMessage {
   /// Escrito por la respuesta automatica de IA, no por una persona.
   aiGenerated    Boolean                  @default(false) @map("ai_generated")
   /// Que hizo la IA con este mensaje (reply, troubleshoot, escalate,
-  /// follow_up). Permite contar los intentos de diagnostico antes de derivar.
+  /// follow_up, hold). Permite contar los intentos de diagnostico antes de derivar.
   aiAction       String?                  @map("ai_action") @db.VarChar(20)
   createdAt      DateTime                 @default(now()) @map("created_at")
   conversation   WhatsappConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)

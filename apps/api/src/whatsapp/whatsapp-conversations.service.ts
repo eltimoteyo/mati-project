@@ -44,7 +44,7 @@ export interface OutboundWhatsappMessage {
   authorId?: string | null;
   /** Lo escribio la respuesta automatica de IA. */
   aiGenerated?: boolean;
-  /** Que hizo la IA: reply, troubleshoot, escalate o follow_up. */
+  /** Que hizo la IA: reply, troubleshoot, escalate, follow_up o hold. */
   aiAction?: string;
 }
 

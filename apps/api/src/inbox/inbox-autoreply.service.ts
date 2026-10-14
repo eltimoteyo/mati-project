@@ -355,6 +355,15 @@ export class InboxAutoReplyService implements OnModuleDestroy {
       return;
     }
 
+    // La IA no respondio (cupo agotado, proveedor caido...) y el contacto no
+    // ha descrito ningun problema: un "hola" no merece un ticket. Se le dice
+    // que lo atendera una persona y se avisa al equipo.
+    if (!decision && !PROBLEM_HINTS.test(this.recentInbound(messages))) {
+      await this.holdForTeam(conversation, messages);
+
+      return;
+    }
+
     // Deriva: lo pidio la IA, se agotaron los intentos o la IA no respondio.
     const forced = decision?.action === 'troubleshoot';
 
@@ -492,6 +501,47 @@ export class InboxAutoReplyService implements OnModuleDestroy {
     }
 
     return { code: ticket.code };
+  }
+
+  /**
+   * Respuesta de espera cuando la IA no esta disponible.
+   *
+   * Se envia una vez por hora como mucho: si el cliente sigue escribiendo
+   * mientras tanto, repetirle lo mismo en cada mensaje solo lo irritaria. No
+   * cuenta como derivacion (accion `hold`): cuando la IA vuelva, atendera los
+   * mensajes siguientes con normalidad.
+   */
+  private async holdForTeam(
+    conversation: ConversationForReply,
+    messages: ChatMessage[],
+  ): Promise<void> {
+    const recentHold = await this.prisma.whatsappMessage.count({
+      where: {
+        conversationId: conversation.id,
+        aiAction: 'hold',
+        createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+    });
+
+    if (recentHold > 0) return;
+
+    await this.send(
+      conversation,
+      'Gracias por escribirnos. En este momento no podemos responderte de forma automática; ' +
+        'una persona del equipo de soporte de CONIT te atenderá en breve.',
+      'hold',
+    );
+
+    const contact = conversation.client?.name ?? `+${conversation.phone}`;
+    const last = messages.at(-1)?.body ?? '';
+
+    await this.notifyAdmins(
+      'WhatsApp sin responder: la IA no esta disponible',
+      `${contact}: ${last}`.slice(0, 500),
+      null,
+    );
+
+    this.logger.warn(`Conversacion ${conversation.id}: IA no disponible; se aviso al equipo sin ticket`);
   }
 
   /* ---------------------------------------------------------------------------
@@ -843,7 +893,7 @@ export class InboxAutoReplyService implements OnModuleDestroy {
   private async send(
     conversation: ConversationForReply,
     text: string,
-    aiAction: 'reply' | 'troubleshoot' | 'escalate' | 'follow_up',
+    aiAction: 'reply' | 'troubleshoot' | 'escalate' | 'follow_up' | 'hold',
   ): Promise<void> {
     const body = `${text}${SIGNATURE}`;
     const result = await this.whatsappCloud.sendText({ to: conversation.phone, body });
