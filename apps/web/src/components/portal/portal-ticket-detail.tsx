@@ -218,6 +218,9 @@ export function PortalTicketDetail({ code }: { code: string }) {
               const isMine =
                 message.source === MESSAGE_SOURCES.PORTAL ||
                 message.source === MESSAGE_SOURCES.EMAIL;
+              // Lo que escribio la IA se presenta como tal: el cliente no
+              // debe creer que le ha contestado una persona.
+              const isAi = message.source === MESSAGE_SOURCES.AI;
 
               return (
                 <div
@@ -226,7 +229,7 @@ export function PortalTicketDetail({ code }: { code: string }) {
                 >
                   <Avatar className="mt-0.5 size-8 shrink-0">
                     <AvatarFallback>
-                      {isMine ? 'TU' : getInitials(message.author?.name ?? 'CONIT')}
+                      {isMine ? 'TU' : isAi ? 'IA' : getInitials(message.author?.name ?? 'CONIT')}
                     </AvatarFallback>
                   </Avatar>
 
@@ -238,8 +241,17 @@ export function PortalTicketDetail({ code }: { code: string }) {
                   >
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="text-xs font-semibold text-foreground">
-                        {isMine ? 'Tu' : (message.author?.name ?? 'Soporte CONIT')}
+                        {isMine
+                          ? 'Tu'
+                          : isAi
+                            ? 'Asistente virtual de CONIT'
+                            : (message.author?.name ?? 'Soporte CONIT')}
                       </span>
+                      {isAi ? (
+                        <span className="text-[0.6875rem] text-muted-foreground">
+                          respuesta automatica
+                        </span>
+                      ) : null}
                       {message.source === MESSAGE_SOURCES.EMAIL ? (
                         <span className="text-[0.6875rem] text-muted-foreground">por correo</span>
                       ) : null}

@@ -114,7 +114,7 @@ export const envSchema = z.object({
   OPENROUTER_FALLBACK_MODELS: z
     .string()
     .trim()
-    .default('z-ai/glm-5.2:free,google/gemma-4-31b-it:free,minimax/minimax-m3:free'),
+    .default('nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free,openrouter/free'),
   OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
 
   // --- Correo saliente ------------------------------------------------------
@@ -161,6 +161,14 @@ export const envSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().trim().optional(),
   /** Identificador del numero remitente en Meta; no es el numero de telefono. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
+  /**
+   * Clave secreta de la app de Meta. Firma cada webhook entrante: sin ella la
+   * bandeja no recibe nada, porque aceptar webhooks sin firmar permitiria a
+   * cualquiera inyectar mensajes.
+   */
+  WHATSAPP_APP_SECRET: z.string().trim().optional(),
+  /** Cadena que inventamos y repetimos en Meta al registrar el webhook. */
+  WHATSAPP_VERIFY_TOKEN: z.string().trim().optional(),
   /** Version de la Graph API. Meta retira las antiguas cada cierto tiempo. */
   WHATSAPP_GRAPH_VERSION: z
     .string()

@@ -20,6 +20,12 @@ export const MESSAGE_SOURCES = {
   EMAIL: 'EMAIL',
   PORTAL: 'PORTAL',
   WHATSAPP: 'WHATSAPP',
+  /**
+   * Escrito por el asistente de IA sin intervencion de una persona. Se
+   * distingue para que ni el equipo ni el cliente lo confundan con una
+   * respuesta de alguien de soporte.
+   */
+  AI: 'AI',
 } as const;
 
 export type MessageSource = (typeof MESSAGE_SOURCES)[keyof typeof MESSAGE_SOURCES];
@@ -29,6 +35,7 @@ export const MESSAGE_SOURCE_LABELS: Record<MessageSource, string> = {
   EMAIL: 'Por correo',
   PORTAL: 'Portal del cliente',
   WHATSAPP: 'WhatsApp',
+  AI: 'Asistente IA',
 };
 
 export const MESSAGE_VISIBILITIES = {

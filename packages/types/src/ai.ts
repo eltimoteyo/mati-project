@@ -53,6 +53,24 @@ export interface AiClassification {
   model: string;
 }
 
+/**
+ * Ticket propuesto a partir de un chat de WhatsApp.
+ *
+ * Es un borrador: se vuelca en el formulario para revisarlo, salvo que quien
+ * atiende elija crearlo directamente.
+ */
+export interface AiTicketDraft {
+  subject: string;
+  description: string;
+  priority: TicketPriority;
+  /** Categoria sugerida de entre las existentes. `null` si ninguna encaja. */
+  categoryId: string | null;
+  categoryName: string | null;
+  /** Por que se propone esa prioridad y categoria, en una frase. */
+  reasoning: string;
+  model: string;
+}
+
 export interface AiSummary {
   /** Resumen del caso en unas pocas frases. */
   summary: string;

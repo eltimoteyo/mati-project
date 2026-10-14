@@ -115,6 +115,13 @@ export function configuration() {
           env.WHATSAPP_ENABLED &&
           Boolean(env.WHATSAPP_ACCESS_TOKEN) &&
           Boolean(env.WHATSAPP_PHONE_NUMBER_ID),
+        /**
+         * Recepcion para la bandeja. Exige la clave de la app (para comprobar
+         * la firma) y el token de verificacion (para registrar el webhook).
+         */
+        appSecret: env.WHATSAPP_APP_SECRET,
+        verifyToken: env.WHATSAPP_VERIFY_TOKEN,
+        inboundEnabled: Boolean(env.WHATSAPP_APP_SECRET) && Boolean(env.WHATSAPP_VERIFY_TOKEN),
       },
     },
 

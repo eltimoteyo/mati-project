@@ -2,9 +2,10 @@ import { Global, Module } from '@nestjs/common';
 
 import { TicketWhatsappService } from './ticket-whatsapp.service';
 import { WhatsappCloudService } from './whatsapp-cloud.service';
+import { WhatsappConversationsService } from './whatsapp-conversations.service';
 
 /**
- * WhatsApp de salida (Meta Cloud API).
+ * WhatsApp por la Cloud API de Meta: envio y registro de conversaciones.
  *
  * Es global por el mismo motivo que el correo: el aviso lo consume el modulo
  * que lo provoca (tickets). Va aparte de `WhatsappModule` —la recepcion por
@@ -13,7 +14,7 @@ import { WhatsappCloudService } from './whatsapp-cloud.service';
  */
 @Global()
 @Module({
-  providers: [WhatsappCloudService, TicketWhatsappService],
-  exports: [WhatsappCloudService, TicketWhatsappService],
+  providers: [WhatsappCloudService, WhatsappConversationsService, TicketWhatsappService],
+  exports: [WhatsappCloudService, WhatsappConversationsService, TicketWhatsappService],
 })
 export class WhatsappCloudModule {}

@@ -3,6 +3,7 @@ export * from './article.schema';
 export * from './auth.schema';
 export * from './category.schema';
 export * from './client.schema';
+export * from './inbox.schema';
 export * from './message.schema';
 export * from './project.schema';
 export * from './rules';

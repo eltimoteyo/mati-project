@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CreateTicketInput,
   SERVICE_TYPE_LABELS,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
@@ -30,6 +31,7 @@ import {
   createTicketSchema,
 } from '@conit/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
@@ -71,6 +73,17 @@ interface TicketFormDialogProps {
   ticket?: TicketDetail | null;
   /** Navega al detalle tras crear. */
   navigateOnCreate?: boolean;
+  /**
+   * Valores con los que arranca el alta (por ejemplo, desde un chat).
+   *
+   * Se aplican al abrir; quien llama debe mantener la misma referencia
+   * mientras el dialogo esta abierto o se perderia lo que se haya escrito.
+   */
+  initialValues?: Partial<CreateTicketFormInput>;
+  /** Alta alternativa al endpoint de tickets (la bandeja enlaza la conversacion). */
+  createMutation?: UseMutationResult<TicketDetail, Error, CreateTicketInput>;
+  /** Sustituye la descripcion del encabezado. */
+  description?: string;
 }
 
 /**
@@ -86,10 +99,14 @@ export function TicketFormDialog({
   onOpenChange,
   ticket = null,
   navigateOnCreate = false,
+  initialValues,
+  createMutation: customCreate,
+  description,
 }: TicketFormDialogProps) {
   const router = useRouter();
   const isEdit = ticket !== null;
-  const createMutation = useCreateTicket();
+  const defaultCreate = useCreateTicket();
+  const createMutation = customCreate ?? defaultCreate;
   const updateMutation = useUpdateTicket();
   const mutation = isEdit ? updateMutation : createMutation;
 
@@ -129,9 +146,9 @@ export function TicketFormDialog({
             assigneeId: ticket.assignee?.id ?? '',
             priority: ticket.priority,
           }
-        : EMPTY,
+        : { ...EMPTY, ...initialValues },
     );
-  }, [open, ticket, reset]);
+  }, [open, ticket, initialValues, reset]);
 
   const onSubmit = handleSubmit((values) => {
     const onError = (error: unknown) => {
@@ -169,7 +186,8 @@ export function TicketFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? `Editar ${ticket.code}` : 'Nuevo ticket'}</DialogTitle>
           <DialogDescription>
-            Registra la incidencia y asignala al servicio y responsable correspondientes.
+            {description ??
+              'Registra la incidencia y asignala al servicio y responsable correspondientes.'}
           </DialogDescription>
         </DialogHeader>
 

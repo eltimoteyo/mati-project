@@ -263,20 +263,18 @@ export class PortalService {
       return ticket;
     });
 
-    const reply = await this.aiService.generatePortalReply(dto.subject, dto.description);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.message.create({
-        data: {
-          ticketId: created.id,
-          body: reply,
-          visibility: MESSAGE_VISIBILITIES.PUBLIC,
-          source: MESSAGE_SOURCES.PANEL,
-        },
-      });
-      await tx.ticket.update({
-        where: { id: created.id },
-        data: { firstResponseAt: new Date() },
-      });
+    // La respuesta automatica no marca la primera respuesta: ese indicador
+    // mide lo que tarda una persona de soporte en atender, y contarla aqui lo
+    // dejaria siempre en cero.
+    const reply = await this.aiService.portalReply(dto.subject, dto.description);
+
+    await this.prisma.message.create({
+      data: {
+        ticketId: created.id,
+        body: reply.text,
+        visibility: MESSAGE_VISIBILITIES.PUBLIC,
+        source: reply.byAi ? MESSAGE_SOURCES.AI : MESSAGE_SOURCES.PANEL,
+      },
     });
     await this.notifySupport(created.id, created.number, dto.subject, 'Nuevo ticket para Sistemas');
 
@@ -334,20 +332,15 @@ export class PortalService {
       }
     });
 
-    const reply = await this.aiService.generatePortalReply(ticket.subject, dto.body);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.message.create({
-        data: {
-          ticketId: ticket.id,
-          body: reply,
-          visibility: MESSAGE_VISIBILITIES.PUBLIC,
-          source: MESSAGE_SOURCES.PANEL,
-        },
-      });
-      await tx.ticket.updateMany({
-        where: { id: ticket.id, firstResponseAt: null },
-        data: { firstResponseAt: new Date() },
-      });
+    const reply = await this.aiService.portalReply(ticket.subject, dto.body);
+
+    await this.prisma.message.create({
+      data: {
+        ticketId: ticket.id,
+        body: reply.text,
+        visibility: MESSAGE_VISIBILITIES.PUBLIC,
+        source: reply.byAi ? MESSAGE_SOURCES.AI : MESSAGE_SOURCES.PANEL,
+      },
     });
     await this.notifySupport(ticket.id, ticket.number, ticket.subject, 'Nueva respuesta automática de IA');
 

@@ -31,6 +31,7 @@ import {
   searchFilter,
   toSkipTake,
 } from '../common/dto/pagination.dto';
+import { slugify } from '../common/utils/slug.util';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma, type Ticket } from '../generated/prisma/client';
 import { TicketMailService } from '../mail/ticket-mail.service';
@@ -126,7 +127,17 @@ export class TicketsService {
    * Escritura
    * ------------------------------------------------------------------------ */
 
-  async create(dto: CreateTicketDto, actorId: string): Promise<TicketDetail> {
+  /**
+   * @param origin De donde viene el alta cuando no es el formulario de
+   *   tickets: la conversacion de WhatsApp que lo origino y la nota que lo
+   *   explica en el historial.
+   */
+  async create(
+    dto: CreateTicketDto,
+    /** Quien lo registra; `null` cuando lo crea el asistente de IA. */
+    actorId: string | null,
+    origin: { whatsappConversationId?: string; note?: string } = {},
+  ): Promise<TicketDetail> {
     await this.assertRelations(dto.clientId, dto.projectId, dto.categoryId, dto.assigneeId);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -139,11 +150,14 @@ export class TicketsService {
           categoryId: dto.categoryId ?? null,
           assigneeId: dto.assigneeId ?? null,
           createdById: actorId,
+          whatsappConversationId: origin.whatsappConversationId ?? null,
           ...(dto.priority ? { priority: dto.priority } : {}),
         },
       });
 
-      const events: PendingEvent[] = [{ type: TICKET_EVENT_TYPES.CREATED }];
+      const events: PendingEvent[] = [
+        { type: TICKET_EVENT_TYPES.CREATED, note: origin.note ?? null },
+      ];
 
       if (dto.assigneeId) {
         const assignee = await tx.user.findUnique({
@@ -160,7 +174,9 @@ export class TicketsService {
       return ticket;
     });
 
-    this.logger.log(`Ticket ${formatTicketCode(created.number)} creado por ${actorId}`);
+    this.logger.log(
+      `Ticket ${formatTicketCode(created.number)} creado por ${actorId ?? 'el asistente de IA'}`,
+    );
 
     // El correo se envia despues de confirmar la transaccion: avisar de un
     // ticket que luego se revierte seria peor que no avisar. `MailService`
@@ -278,46 +294,7 @@ export class TicketsService {
     // informacion de proceso: enviarlos convertiria su buzon en un registro de
     // auditoria y acabaria en la carpeta de correo no deseado.
     if (dto.status === 'RESOLVED' && current.status !== 'RESOLVED') {
-      const resolvedTicket = await this.prisma.ticket.findUnique({
-        where: { id: current.id },
-        select: { subject: true, description: true, categoryId: true },
-      });
-
-      if (resolvedTicket) {
-        const finalReply = await this.aiService.generateResolutionReply(
-          resolvedTicket.subject,
-          resolvedTicket.description,
-        );
-        const article = await this.aiService.generateKnowledgeArticle(
-          resolvedTicket.subject,
-          resolvedTicket.description,
-          finalReply,
-        );
-        const articleSlug = `${article.title.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-').replace(/^-+|-+$/g, '')}-${current.id.slice(0, 8)}`;
-
-        await this.prisma.$transaction(async (tx) => {
-          await tx.message.create({
-            data: {
-              ticketId: current.id,
-              body: finalReply,
-              visibility: MESSAGE_VISIBILITIES.PUBLIC,
-              source: MESSAGE_SOURCES.PANEL,
-            },
-          });
-          await tx.article.create({
-            data: {
-              title: article.title,
-              slug: articleSlug,
-              summary: article.summary,
-              content: article.content,
-              categoryId: resolvedTicket.categoryId,
-              authorId: actorId,
-              isPublished: true,
-            },
-          });
-        });
-      }
-
+      await this.closeWithAssistant(current, actorId);
       await this.ticketMail.sendTicketResolved(current.id);
     }
 
@@ -460,6 +437,82 @@ export class TicketsService {
     return data;
   }
 
+  /**
+   * Cierre asistido de una resolucion: mensaje al cliente y borrador de articulo.
+   *
+   * El mensaje lleva origen `AI` solo si lo escribio la IA; sin ella sale el
+   * texto de plantilla como mensaje del panel. El articulo queda como
+   * **borrador**: publicar sin que nadie lo lea lo que un modelo dedujo de un
+   * ticket llenaria la base de conocimiento de soluciones a medias. Sin IA no
+   * se crea ninguno.
+   *
+   * Nada de esto puede tumbar la resolucion, que ya esta guardada: un fallo se
+   * registra y se sigue.
+   */
+  private async closeWithAssistant(current: Ticket, actorId: string): Promise<void> {
+    const code = formatTicketCode(current.number);
+
+    try {
+      const ticket = await this.prisma.ticket.findUnique({
+        where: { id: current.id },
+        select: { subject: true, description: true, categoryId: true },
+      });
+
+      if (!ticket) return;
+
+      const reply = await this.aiService.resolutionReply(ticket.subject, ticket.description);
+
+      await this.prisma.message.create({
+        data: {
+          ticketId: current.id,
+          body: reply.text,
+          visibility: MESSAGE_VISIBILITIES.PUBLIC,
+          source: reply.byAi ? MESSAGE_SOURCES.AI : MESSAGE_SOURCES.PANEL,
+        },
+      });
+
+      const article = await this.aiService.generateKnowledgeArticle(
+        ticket.subject,
+        ticket.description,
+        reply.text,
+      );
+
+      if (!article) return;
+
+      await this.prisma.article.create({
+        data: {
+          title: article.title,
+          slug: await this.articleSlug(article.title, code),
+          summary: article.summary,
+          content: article.content,
+          categoryId: ticket.categoryId,
+          authorId: actorId,
+          isPublished: false,
+        },
+      });
+
+      this.logger.log(`${code}: borrador de articulo generado para la base de conocimiento`);
+    } catch (error) {
+      this.logger.warn(
+        `${code}: cierre asistido incompleto: ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
+  }
+
+  /**
+   * Slug libre para el articulo.
+   *
+   * Lleva el codigo del ticket para que dos resoluciones con el mismo titulo
+   * —un ticket que se reabre y se vuelve a resolver— no choquen.
+   */
+  private async articleSlug(title: string, code: string): Promise<string> {
+    const base = `${slugify(title) || 'solucion'}-${code.toLowerCase()}`;
+
+    const taken = await this.prisma.article.findUnique({ where: { slug: base }, select: { id: true } });
+
+    return taken ? `${base}-${Date.now().toString(36)}` : base;
+  }
+
   /* ---------------------------------------------------------------------------
    * Avisos
    * ------------------------------------------------------------------------ */
@@ -473,7 +526,7 @@ export class TicketsService {
   private async notifyOnCreate(
     tx: Prisma.TransactionClient,
     ticket: Ticket,
-    actorId: string,
+    actorId: string | null,
   ): Promise<void> {
     const label = NotificationsService.ticketLabel(ticket.number, ticket.subject);
 
@@ -497,7 +550,7 @@ export class TicketsService {
     // esperando a que alguien mire la bandeja: se avisa a todo el equipo.
     if (ticket.priority === 'CRITICAL' && !ticket.assigneeId) {
       const admins = await tx.user.findMany({
-        where: { role: 'ADMIN', status: 'ACTIVE', id: { not: actorId } },
+        where: { role: 'ADMIN', status: 'ACTIVE', ...(actorId ? { id: { not: actorId } } : {}) },
         select: { id: true },
       });
 
@@ -564,7 +617,7 @@ export class TicketsService {
   private async writeEvents(
     tx: Prisma.TransactionClient,
     ticketId: string,
-    actorId: string,
+    actorId: string | null,
     events: PendingEvent[],
   ): Promise<void> {
     if (events.length === 0) return;

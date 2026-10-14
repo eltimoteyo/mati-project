@@ -54,6 +54,10 @@ export const VALIDATION_RULES = {
   message: {
     body: { minLength: 1, maxLength: 5000 },
   },
+  /** Limite de Meta para un mensaje de texto de WhatsApp. */
+  whatsapp: {
+    body: { minLength: 1, maxLength: 4096 },
+  },
   pagination: {
     defaultPageSize: 20,
     maxPageSize: 100,

@@ -55,6 +55,17 @@ export const queryKeys = {
     detail: (idOrCode: string) => [...queryKeys.tickets.all, 'detail', idOrCode] as const,
   },
 
+  inbox: {
+    all: ['inbox'] as const,
+    list: (filters: object) => [...queryKeys.inbox.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.inbox.all, 'detail', id] as const,
+  },
+
+  settings: {
+    all: ['settings'] as const,
+    automation: () => [...queryKeys.settings.all, 'automation'] as const,
+  },
+
   ai: {
     all: ['ai'] as const,
     status: () => [...queryKeys.ai.all, 'status'] as const,

@@ -19,12 +19,14 @@ import type { AppConfig } from './config/configuration';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
+import { InboxModule } from './inbox/inbox.module';
 import { MailModule } from './mail/mail.module';
 import { MessagesModule } from './messages/messages.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PortalModule } from './portal/portal.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
@@ -76,6 +78,8 @@ import { WhatsappCloudModule } from './whatsapp/whatsapp-cloud.module';
     AiModule,
     WhatsappModule,
     WhatsappCloudModule,
+    SettingsModule,
+    InboxModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -33,6 +33,7 @@ model User {
   ticketEvents            TicketEvent[]
   assignedTickets         Ticket[]                 @relation("TicketAssignee")
   createdTickets          Ticket[]                 @relation("TicketCreatedBy")
+  whatsappMessages        WhatsappMessage[]
 
   @@index([role, status])
   @@map("users")
@@ -66,23 +67,24 @@ model Session {
 /// cliente sin darle acceso al sistema. `userId` enlaza con sus credenciales
 /// cuando llegue el portal de cliente.
 model Client {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String       @db.VarChar(160)
+  id                    String                 @id @default(uuid()) @db.Uuid
+  name                  String                 @db.VarChar(160)
   /// Identificador fiscal (RUC). Unico cuando esta presente.
-  taxId       String?      @unique @map("tax_id") @db.VarChar(20)
-  contactName String?      @map("contact_name") @db.VarChar(120)
-  email       String       @db.VarChar(180)
-  phone       String?      @db.VarChar(40)
-  address     String?      @db.VarChar(300)
-  notes       String?      @db.VarChar(2000)
-  status      ClientStatus @default(ACTIVE)
+  taxId                 String?                @unique @map("tax_id") @db.VarChar(20)
+  contactName           String?                @map("contact_name") @db.VarChar(120)
+  email                 String                 @db.VarChar(180)
+  phone                 String?                @db.VarChar(40)
+  address               String?                @db.VarChar(300)
+  notes                 String?                @db.VarChar(2000)
+  status                ClientStatus           @default(ACTIVE)
   /// Usuario con acceso al portal; se rellenara en la fase del portal.
-  userId      String?      @unique @map("user_id") @db.Uuid
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  user        User?        @relation(fields: [userId], references: [id])
-  projects    Project[]
-  tickets     Ticket[]
+  userId                String?                @unique @map("user_id") @db.Uuid
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  user                  User?                  @relation(fields: [userId], references: [id])
+  projects              Project[]
+  tickets               Ticket[]
+  whatsappConversations WhatsappConversation[]
 
   @@index([status])
   @@index([name])
@@ -138,34 +140,37 @@ model Category {
 
 /// Incidencia registrada sobre un servicio de un cliente.
 model Ticket {
-  id              String         @id @default(uuid()) @db.Uuid
+  id                     String                @id @default(uuid()) @db.Uuid
   /// Correlativo generado por una secuencia de PostgreSQL. Del deriva el
   /// codigo visible (`CNT-0042`), que se compone en la capa de presentacion:
   /// asi la numeracion es atomica y no hay dos tickets con el mismo codigo.
-  number          Int            @unique @default(autoincrement())
-  subject         String         @db.VarChar(200)
-  description     String
-  status          TicketStatus   @default(NEW)
-  priority        TicketPriority @default(MEDIUM)
-  clientId        String         @map("client_id") @db.Uuid
-  projectId       String?        @map("project_id") @db.Uuid
-  categoryId      String?        @map("category_id") @db.Uuid
-  assigneeId      String?        @map("assignee_id") @db.Uuid
-  createdById     String?        @map("created_by_id") @db.Uuid
+  number                 Int                   @unique @default(autoincrement())
+  subject                String                @db.VarChar(200)
+  description            String
+  status                 TicketStatus          @default(NEW)
+  priority               TicketPriority        @default(MEDIUM)
+  clientId               String                @map("client_id") @db.Uuid
+  projectId              String?               @map("project_id") @db.Uuid
+  categoryId             String?               @map("category_id") @db.Uuid
+  assigneeId             String?               @map("assignee_id") @db.Uuid
+  createdById            String?               @map("created_by_id") @db.Uuid
   /// Momento de la primera respuesta de soporte; base del indicador de SLA.
-  firstResponseAt DateTime?      @map("first_response_at")
-  resolvedAt      DateTime?      @map("resolved_at")
-  closedAt        DateTime?      @map("closed_at")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  messages        Message[]
-  notifications   Notification[]
-  events          TicketEvent[]
-  assignee        User?          @relation("TicketAssignee", fields: [assigneeId], references: [id])
-  category        Category?      @relation(fields: [categoryId], references: [id])
-  client          Client         @relation(fields: [clientId], references: [id])
-  createdBy       User?          @relation("TicketCreatedBy", fields: [createdById], references: [id])
-  project         Project?       @relation(fields: [projectId], references: [id])
+  firstResponseAt        DateTime?             @map("first_response_at")
+  resolvedAt             DateTime?             @map("resolved_at")
+  closedAt               DateTime?             @map("closed_at")
+  /// Conversacion de WhatsApp desde la que se creo, si vino de la bandeja.
+  whatsappConversationId String?               @map("whatsapp_conversation_id") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  messages               Message[]
+  notifications          Notification[]
+  events                 TicketEvent[]
+  assignee               User?                 @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  category               Category?             @relation(fields: [categoryId], references: [id])
+  client                 Client                @relation(fields: [clientId], references: [id])
+  createdBy              User?                 @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  project                Project?              @relation(fields: [projectId], references: [id])
+  whatsappConversation   WhatsappConversation? @relation(fields: [whatsappConversationId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([priority])
@@ -175,6 +180,7 @@ model Ticket {
   @@index([assigneeId])
   @@index([createdAt])
   @@index([status, priority])
+  @@index([whatsappConversationId])
   @@map("tickets")
 }
 
@@ -279,6 +285,79 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
+/// Conversacion de WhatsApp con un numero, tal como llega a la bandeja.
+///
+/// Se agrupa por numero y no por cliente: un mensaje puede llegar de un numero
+/// que no esta en ninguna ficha, y aun asi hay que poder atenderlo.
+model WhatsappConversation {
+  id            String            @id @default(uuid()) @db.Uuid
+  /// Numero tal como lo identifica Meta: solo digitos, con codigo de pais.
+  phone         String            @unique @db.VarChar(32)
+  /// Nombre del perfil de WhatsApp. Lo elige el contacto, no CONIT.
+  profileName   String?           @map("profile_name") @db.VarChar(120)
+  /// Cliente al que pertenece el numero; null mientras sea desconocido.
+  clientId      String?           @map("client_id") @db.Uuid
+  /// Ultimo mensaje del contacto: abre la ventana de 24 horas para responder.
+  lastInboundAt DateTime?         @map("last_inbound_at")
+  lastMessageAt DateTime          @default(now()) @map("last_message_at")
+  /// Mensajes del contacto que nadie del equipo ha abierto todavia.
+  unreadCount   Int               @default(0) @map("unread_count")
+  /// La respuesta automatica no actua hasta esta fecha: alguien del equipo
+  /// tomo la conversacion o la IA la derivo a un ticket.
+  aiPausedUntil DateTime?         @map("ai_paused_until")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  client        Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  messages      WhatsappMessage[]
+  tickets       Ticket[]
+
+  @@index([lastMessageAt])
+  @@index([clientId])
+  @@map("whatsapp_conversations")
+}
+
+/// Mensaje de WhatsApp, recibido del contacto o enviado por CONIT.
+model WhatsappMessage {
+  id             String                   @id @default(uuid()) @db.Uuid
+  conversationId String                   @map("conversation_id") @db.Uuid
+  /// Identificador de Meta (`wamid`). Unico porque Meta reintenta los
+  /// webhooks y el mismo mensaje puede llegar mas de una vez.
+  externalId     String?                  @unique @map("external_id") @db.VarChar(200)
+  direction      WhatsappMessageDirection
+  /// Tipo segun Meta (text, image, audio...). Lo que no es texto se guarda
+  /// con una descripcion legible en `body`.
+  type           String                   @default("text") @db.VarChar(30)
+  body           String
+  status         WhatsappMessageStatus
+  /// Motivo que da Meta cuando un envio no se entrega.
+  error          String?                  @db.VarChar(500)
+  /// Quien respondio desde la bandeja; null en lo recibido y en los avisos.
+  authorId       String?                  @map("author_id") @db.Uuid
+  /// Escrito por la respuesta automatica de IA, no por una persona.
+  aiGenerated    Boolean                  @default(false) @map("ai_generated")
+  /// Que hizo la IA con este mensaje (reply, troubleshoot, escalate,
+  /// follow_up). Permite contar los intentos de diagnostico antes de derivar.
+  aiAction       String?                  @map("ai_action") @db.VarChar(20)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  conversation   WhatsappConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         User?                    @relation(fields: [authorId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("whatsapp_messages")
+}
+
+/// Ajuste del sistema que se cambia desde el panel, sin redesplegar.
+///
+/// Clave y valor JSON: cada ajuste tiene su propia forma, que valida el
+/// servicio que lo usa.
+model AppSetting {
+  key       String   @id @db.VarChar(80)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
 /// Rol funcional del usuario dentro del sistema.
 /// SYSTEMS es el equipo de sistemas: gestiona tickets generados por la IA.
 enum UserRole {
@@ -370,6 +449,8 @@ enum MessageSource {
   PORTAL
   /// Recibido por WhatsApp del cliente.
   WHATSAPP
+  /// Escrito por el asistente de IA sin intervencion de una persona.
+  AI
 }
 
 enum MessageVisibility {
@@ -377,6 +458,23 @@ enum MessageVisibility {
   PUBLIC
   /// Solo para el equipo de soporte.
   INTERNAL
+}
+
+enum WhatsappMessageDirection {
+  /// Escrito por el contacto.
+  INBOUND
+  /// Enviado por CONIT: respuesta desde la bandeja o aviso de un ticket.
+  OUTBOUND
+}
+
+/// Estado de un mensaje. Los salientes avanzan con los avisos de Meta.
+enum WhatsappMessageStatus {
+  RECEIVED
+  ACCEPTED
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
 enum NotificationType {

@@ -5,6 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/configuration';
 import { PrismaService } from '../database/prisma.service';
 import { type SendWhatsappResult, WhatsappCloudService } from './whatsapp-cloud.service';
+import {
+  type OutboundWhatsappMessage,
+  WhatsappConversationsService,
+} from './whatsapp-conversations.service';
 
 /** Digitos minimos para considerar que hay un telefono utilizable. */
 const PHONE_MIN_DIGITS = 8;
@@ -23,7 +27,8 @@ const PARAM_MAX_LENGTH = 150;
  *   {{2}} asunto
  *   {{3}} estado al que ha pasado (Resuelto, Cerrado)
  *
- * Si Meta rechaza la plantilla, el mismo aviso sale como texto libre.
+ * Si Meta rechaza la plantilla, el mismo aviso sale como texto libre. Lo que
+ * sale queda registrado en la conversacion de la bandeja.
  */
 @Injectable()
 export class TicketWhatsappService {
@@ -33,6 +38,7 @@ export class TicketWhatsappService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsappCloud: WhatsappCloudService,
+    private readonly conversations: WhatsappConversationsService,
     configService: ConfigService<AppConfig, true>,
   ) {
     this.config = configService.get('whatsapp', { infer: true }).cloud;
@@ -72,26 +78,52 @@ export class TicketWhatsappService {
     const subject = toTemplateParam(ticket.subject);
     const status = TICKET_STATUS_LABELS[ticket.status as TicketStatus] ?? ticket.status;
 
-    const result = await this.whatsappCloud.sendTemplate({
+    // Mismo texto que la plantilla: es lo que se registra en la bandeja y lo
+    // que sale si hay que recurrir al texto libre.
+    const body =
+      `Hola, te escribimos de CONIT Soporte. Tu solicitud ${code} (${subject}) ha pasado al ` +
+      `estado: ${status}. Si el problema continúa o necesitas algo más, contáctanos y la retomamos.`;
+
+    let type = 'template';
+    let result = await this.whatsappCloud.sendTemplate({
       to,
       template: this.config.ticketStatusTemplate,
       language: this.config.templateLanguage,
       bodyParams: [code, subject, status],
     });
 
-    if (result.sent || !isTemplateError(result.errorCode)) return result;
+    if (!result.sent && isTemplateError(result.errorCode)) {
+      // Sin plantilla utilizable se intenta con texto libre, que solo llega si
+      // el cliente escribio en las ultimas 24 horas. Es preferible un aviso
+      // que quiza no llegue a no enviar ninguno.
+      this.logger.warn(`${code}: plantilla no disponible, el aviso sale como texto libre`);
 
-    // Sin plantilla utilizable se intenta con texto libre, que solo llega si
-    // el cliente escribio en las ultimas 24 horas. Es preferible un aviso que
-    // quiza no llegue a no enviar ninguno.
-    this.logger.warn(`${code}: plantilla no disponible, el aviso sale como texto libre`);
+      type = 'text';
+      result = await this.whatsappCloud.sendText({ to, body });
+    }
 
-    return this.whatsappCloud.sendText({
-      to,
-      body:
-        `Hola, te escribimos de CONIT Soporte. Tu solicitud ${code} (${subject}) ha pasado al ` +
-        `estado: ${status}. Si el problema continúa o necesitas algo más, contáctanos y la retomamos.`,
-    });
+    if (result.sent) {
+      await this.recordInInbox(code, { phone: to, externalId: result.id ?? null, type, body });
+    }
+
+    return result;
+  }
+
+  /**
+   * Deja el aviso en la conversacion de la bandeja.
+   *
+   * Un fallo aqui no anula el aviso, que ya salio: se registra y se sigue.
+   */
+  private async recordInInbox(code: string, message: OutboundWhatsappMessage): Promise<void> {
+    try {
+      await this.conversations.recordOutbound(message);
+    } catch (error) {
+      this.logger.warn(
+        `${code}: el aviso salio pero no se pudo registrar en la bandeja: ${
+          error instanceof Error ? error.message : 'error desconocido'
+        }`,
+      );
+    }
   }
 }
 

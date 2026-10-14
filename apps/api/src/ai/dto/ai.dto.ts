@@ -5,6 +5,7 @@ import {
   type AiStatus,
   type AiSuggestion,
   type AiSummary,
+  type AiTicketDraft,
   TICKET_PRIORITIES,
   type TicketPriority,
 } from '@conit/types';
@@ -60,6 +61,29 @@ export class AiClassificationDto implements AiClassification {
   priority!: TicketPriority;
 
   @ApiProperty({ example: 'El correo corporativo no llega a ningun buzon del dominio.' })
+  reasoning!: string;
+
+  @ApiProperty()
+  model!: string;
+}
+
+export class AiTicketDraftDto implements AiTicketDraft {
+  @ApiProperty({ example: 'El correo corporativo no envia mensajes' })
+  subject!: string;
+
+  @ApiProperty()
+  description!: string;
+
+  @ApiProperty({ enum: Object.values(TICKET_PRIORITIES) })
+  priority!: TicketPriority;
+
+  @ApiPropertyOptional({ nullable: true, format: 'uuid' })
+  categoryId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  categoryName!: string | null;
+
+  @ApiProperty({ example: 'Afecta a todo el equipo administrativo desde ayer.' })
   reasoning!: string;
 
   @ApiProperty()

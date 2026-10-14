@@ -143,7 +143,7 @@ export function CategoriesView() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="IA Soporte"
+        title="Categorias y SLA"
         description="Clasificacion de incidencias y tiempos objetivo de atencion."
         actions={
           <Button

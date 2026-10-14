@@ -25,6 +25,9 @@
 
 import 'dotenv/config';
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { VALIDATION_RULES } from '@conit/validation';
 import { Algorithm, hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -464,6 +467,96 @@ async function seedDemoData(adminId: string): Promise<void> {
 }
 
 /* =============================================================================
+ * Guias de soporte de primer nivel
+ * ========================================================================== */
+
+/** Carpeta de las guias; ver `prisma/guides/README.md`. */
+const GUIDES_DIR = join(__dirname, 'guides');
+
+interface SupportGuide {
+  title: string;
+  slug: string;
+  summary: string;
+  category: string;
+  content: string;
+}
+
+/** Lee una guia: cabecera `clave: valor` entre `---` y el contenido en Markdown. */
+function parseGuide(raw: string, file: string): SupportGuide {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(raw);
+
+  if (!match?.[1] || match[2] === undefined) {
+    throw new Error(`La guia ${file} no tiene la cabecera entre lineas ---.`);
+  }
+
+  const meta = new Map(
+    match[1]
+      .split(/\r?\n/)
+      .map((line) => /^(\w+):\s*(.*)$/.exec(line))
+      .filter((entry): entry is RegExpExecArray => entry !== null)
+      .map((entry) => [entry[1], entry[2]?.trim() ?? ''] as const),
+  );
+
+  const field = (name: string): string => {
+    const value = meta.get(name);
+
+    if (!value) throw new Error(`La guia ${file} no indica "${name}".`);
+
+    return value;
+  };
+
+  return {
+    title: field('title'),
+    slug: field('slug'),
+    summary: field('summary'),
+    category: field('category'),
+    content: match[2].replace(/\r\n/g, '\n').trim(),
+  };
+}
+
+/**
+ * Siembra las guias en todos los entornos, no solo en la demostracion: son el
+ * contenido con el que la IA de WhatsApp intenta resolver antes de derivar.
+ * Una guia que ya existe no se toca, para no pisar lo editado desde el panel.
+ */
+async function seedSupportGuides(authorId: string): Promise<void> {
+  const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const categoryBySlug = new Map(categories.map((category) => [category.slug, category.id]));
+
+  const guides = readdirSync(GUIDES_DIR)
+    .filter((file) => file.endsWith('.md') && file !== 'README.md')
+    .sort()
+    .map((file) => parseGuide(readFileSync(join(GUIDES_DIR, file), 'utf8'), file));
+
+  let created = 0;
+
+  for (const guide of guides) {
+    const already = await prisma.article.findUnique({
+      where: { slug: guide.slug },
+      select: { id: true },
+    });
+
+    if (already) continue;
+
+    await prisma.article.create({
+      data: {
+        title: guide.title,
+        slug: guide.slug,
+        summary: guide.summary,
+        content: guide.content,
+        categoryId: categoryBySlug.get(guide.category) ?? null,
+        authorId,
+        isPublished: true,
+      },
+    });
+
+    created += 1;
+  }
+
+  console.log(`  OK  ${created} guias de soporte nuevas (${guides.length} en total)`);
+}
+
+/* =============================================================================
  * Base de conocimiento de demostracion
  * ========================================================================== */
 
@@ -530,6 +623,7 @@ async function main(): Promise<void> {
   }
 
   await seedCategories();
+  await seedSupportGuides(adminId);
 
   if (process.env['SEED_DEMO_DATA'] === 'true') {
     await seedDemoData(adminId);

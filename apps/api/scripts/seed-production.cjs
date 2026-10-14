@@ -2,6 +2,9 @@
  * Inicializacion de produccion sin depender de ts-node ni de la configuracion
  * TypeScript del monorepo. Se ejecuta al arrancar el contenedor y es idempotente.
  */
+const { existsSync, readdirSync, readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
 const { Algorithm, hash } = require('@node-rs/argon2');
 const { PrismaPg } = require('@prisma/adapter-pg');
 // El contenedor de produccion solo conserva el resultado de Nest en `dist`.
@@ -43,6 +46,74 @@ async function upsertAccount(prefix, role) {
   });
 }
 
+/**
+ * Guias de soporte de primer nivel (`prisma/guides/*.md`). Misma lectura que
+ * `prisma/seed.ts`: cabecera `clave: valor` entre `---` y el contenido en
+ * Markdown. Solo se crean las que no existen, para no pisar lo editado desde
+ * el panel.
+ */
+function readSupportGuides() {
+  const dir = join(__dirname, '..', 'prisma', 'guides');
+
+  // Este script corre en cada arranque del contenedor: si la imagen se
+  // construyera sin las guias, mejor avisar que impedir que arranque la API.
+  if (!existsSync(dir)) {
+    console.warn(`No se encontraron las guias de soporte en ${dir}; se omiten.`);
+
+    return [];
+  }
+
+  return readdirSync(dir)
+    .filter((file) => file.endsWith('.md') && file !== 'README.md')
+    .sort()
+    .map((file) => {
+      const raw = readFileSync(join(dir, file), 'utf8');
+      const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(raw);
+      if (!match) throw new Error(`La guia ${file} no tiene la cabecera entre lineas ---.`);
+
+      const meta = Object.fromEntries(
+        match[1]
+          .split(/\r?\n/)
+          .map((line) => /^(\w+):\s*(.*)$/.exec(line))
+          .filter(Boolean)
+          .map((entry) => [entry[1], entry[2].trim()]),
+      );
+
+      for (const key of ['title', 'slug', 'summary', 'category']) {
+        if (!meta[key]) throw new Error(`La guia ${file} no indica "${key}".`);
+      }
+
+      return { ...meta, content: match[2].replace(/\r\n/g, '\n').trim() };
+    });
+}
+
+async function seedSupportGuides(authorId) {
+  const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const categoryBySlug = new Map(categories.map((category) => [category.slug, category.id]));
+
+  let created = 0;
+
+  for (const guide of readSupportGuides()) {
+    const already = await prisma.article.findUnique({ where: { slug: guide.slug }, select: { id: true } });
+    if (already) continue;
+
+    await prisma.article.create({
+      data: {
+        title: guide.title,
+        slug: guide.slug,
+        summary: guide.summary,
+        content: guide.content,
+        categoryId: categoryBySlug.get(guide.category) ?? null,
+        authorId,
+        isPublished: true,
+      },
+    });
+    created += 1;
+  }
+
+  return created;
+}
+
 async function main() {
   const admin = await upsertAccount('ADMIN', 'ADMIN');
   const client = await upsertAccount('CLIENT', 'CLIENT');
@@ -70,7 +141,9 @@ async function main() {
     });
   }
 
-  console.log(`Inicializacion completada: ${admin.email} y ${client.email}.`);
+  const guides = await seedSupportGuides(admin.id);
+
+  console.log(`Inicializacion completada: ${admin.email} y ${client.email}; ${guides} guias nuevas.`);
 }
 
 main().finally(() => prisma.$disconnect());

@@ -5,6 +5,7 @@ import {
   type AiStatus,
   type AiSuggestion,
   type AiSummary,
+  type AiTicketDraft,
   formatTicketCode,
   MESSAGE_VISIBILITIES,
   TICKET_PRIORITIES,
@@ -36,6 +37,105 @@ const TONE_GUIDANCE: Record<AiReplyTone, string> = {
   TECHNICAL:
     'Tono tecnico: detalla causa, diagnostico y pasos concretos. Puedes usar terminos precisos.',
 };
+
+/** Criterio de prioridad comun a clasificar un ticket y a proponerlo desde un chat. */
+const PRIORITY_CRITERIA = [
+  'Criterio de prioridad:',
+  '- CRITICAL: servicio caido o datos en riesgo; afecta a todos los usuarios.',
+  '- HIGH: funcion importante rota, con impacto en el trabajo diario.',
+  '- MEDIUM: problema acotado o con solucion alternativa.',
+  '- LOW: consulta, mejora o incidencia cosmetica.',
+];
+
+/**
+ * Escapa los saltos de linea y tabuladores que aparecen literales dentro de
+ * las cadenas de un JSON.
+ *
+ * Al escribir un mensaje de varias lineas —una lista de pasos, por ejemplo—
+ * los modelos suelen meter el salto tal cual en lugar de `\n`, y `JSON.parse`
+ * rechaza la respuesta entera aunque todo lo demas este bien.
+ */
+function escapeControlCharacters(json: string): string {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const char of json) {
+    if (!inString) {
+      if (char === '"') inString = true;
+      result += char;
+    } else if (escaped) {
+      escaped = false;
+      result += char;
+    } else if (char === '\\') {
+      escaped = true;
+      result += char;
+    } else if (char === '"') {
+      inString = false;
+      result += char;
+    } else if (char === '\n') {
+      result += '\\n';
+    } else if (char === '\t') {
+      result += '\\t';
+    } else if (char !== '\r') {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
+/** Categoria tal como se le ofrece al modelo. */
+interface CatalogueCategory {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/** Texto automatico y si lo escribio la IA o es la plantilla de reserva. */
+export interface AutomaticText {
+  text: string;
+  byAi: boolean;
+}
+
+/** Lo que necesita la IA para atender un WhatsApp, ya formateado como texto. */
+export interface WhatsappReplyContext {
+  /** Nombre del cliente y numero, o solo el numero si es desconocido. */
+  contact: string;
+  /** Servicios contratados por el cliente, uno por linea. */
+  services: string;
+  /** Resultado de las comprobaciones automaticas, una por linea. */
+  diagnostics: string;
+  /** Tickets abiertos del cliente, uno por linea. */
+  openTickets: string;
+  /**
+   * Seguimiento: la conversacion ya se derivo y espera al equipo. Describe el
+   * ticket abierto (o que se paso al equipo sin ticket). Vacio si no aplica.
+   */
+  followUp: string;
+  /** Intentos de diagnostico ya hechos sobre el problema actual. */
+  troubleshootAttempts: number;
+  maxTroubleshootAttempts: number;
+  /** Articulos de la base de conocimiento relacionados. */
+  knowledge: string;
+  /** Conversacion reciente, de la mas antigua a la mas reciente. */
+  transcript: string;
+}
+
+export type WhatsappAiAction = 'reply' | 'troubleshoot' | 'escalate';
+
+export interface WhatsappReplyDecision {
+  action: WhatsappAiAction;
+  /**
+   * Texto para el cliente. Al derivar es la explicacion de lo que podria
+   * estar pasando; el codigo del ticket lo anade quien llama.
+   */
+  message: string;
+  /** Datos del ticket, propuestos al diagnosticar o derivar. */
+  draft: AiTicketDraft | null;
+  reasoning: string;
+  model: string;
+}
 
 /** Contexto del ticket que se arma una sola vez y comparten las tres tareas. */
 interface TicketContext {
@@ -77,89 +177,315 @@ export class AiService {
    * Redactar una respuesta
    * ------------------------------------------------------------------------ */
 
-  async generatePortalReply(subject: string, description: string, conversation = ''): Promise<string> {
+  /** Hay proveedor configurado. Sin el, lo automatico usa textos de plantilla. */
+  isAvailable(): boolean {
+    return this.provider.isAvailable();
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Respuestas automaticas
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * Respuesta automatica a lo que el cliente escribe en el portal.
+   *
+   * Devuelve tambien si la escribio la IA, para que el mensaje se marque como
+   * tal y no se confunda con una respuesta de una persona de soporte.
+   */
+  async portalReply(subject: string, description: string, conversation = ''): Promise<AutomaticText> {
     const fallback =
       'Hemos recibido tu consulta y la hemos enviado al equipo de sistemas. ' +
       'La revisaremos dentro de este ticket y te informaremos por aquí cuando esté resuelta.';
 
-    if (!this.provider.isAvailable()) return fallback;
+    if (!this.provider.isAvailable()) return { text: fallback, byAi: false };
 
     try {
-      const completion = await this.provider.complete([
-        {
-          role: 'system',
-          content: [
-            'Eres la IA de soporte de CONIT.',
-            'Responde en español, de forma clara, breve y profesional.',
-            'Responde la consulta del cliente sin inventar soluciones ni plazos.',
-            'Indica que la solicitud queda registrada para el equipo de sistemas.',
-            'Devuelve únicamente el texto que verá el cliente.',
-          ].join('\\n'),
-        },
-        {
-          role: 'user',
-          content: `Asunto: ${subject}\\n\\nConsulta: ${description}\\n\\nHistorial: ${conversation || 'Sin mensajes previos.'}`,
-        },
-      ], { temperature: 0.25, maxTokens: 350 });
+      const completion = await this.provider.complete(
+        [
+          {
+            role: 'system',
+            content: [
+              'Eres la IA de soporte de CONIT.',
+              'Responde en español, de forma clara, breve y profesional.',
+              'Responde la consulta del cliente sin inventar soluciones ni plazos.',
+              'Indica que la solicitud queda registrada para el equipo de sistemas.',
+              'Devuelve únicamente el texto que verá el cliente.',
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: `Asunto: ${subject}\n\nConsulta: ${description}\n\nHistorial: ${conversation || 'Sin mensajes previos.'}`,
+          },
+        ],
+        { temperature: 0.25, maxTokens: 350 },
+      );
 
-      return completion.content.trim() || fallback;
+      const text = completion.content.trim();
+
+      return text ? { text, byAi: true } : { text: fallback, byAi: false };
     } catch (error) {
-      this.logger.warn(`Respuesta automática no disponible: ${error instanceof Error ? error.message : String(error)}`);
-      return fallback;
+      this.logger.warn(`Respuesta automática no disponible: ${this.reason(error)}`);
+
+      return { text: fallback, byAi: false };
     }
   }
 
-  async generateResolutionReply(subject: string, description: string): Promise<string> {
+  /** Version que solo devuelve el texto, para quien no necesita saber el origen. */
+  async generatePortalReply(subject: string, description: string, conversation = ''): Promise<string> {
+    return (await this.portalReply(subject, description, conversation)).text;
+  }
+
+  /** Mensaje al cliente al resolverse su ticket. */
+  async resolutionReply(subject: string, description: string): Promise<AutomaticText> {
     const fallback = `Ya está resuelto: hemos atendido tu solicitud sobre «${subject}». Si vuelve a ocurrir, puedes escribirnos en este mismo ticket.`;
 
-    if (!this.provider.isAvailable()) return fallback;
+    if (!this.provider.isAvailable()) return { text: fallback, byAi: false };
 
     try {
-      const completion = await this.provider.complete([
-        {
-          role: 'system',
-          content: 'Escribe un mensaje breve en español confirmando al cliente que su solicitud ya está resuelta. Devuelve solo el mensaje.',
-        },
-        { role: 'user', content: `Asunto: ${subject}\\nDescripción: ${description}` },
-      ], { temperature: 0.2, maxTokens: 180 });
+      const completion = await this.provider.complete(
+        [
+          {
+            role: 'system',
+            content:
+              'Escribe un mensaje breve en español confirmando al cliente que su solicitud ya está resuelta. Devuelve solo el mensaje.',
+          },
+          { role: 'user', content: `Asunto: ${subject}\nDescripción: ${description}` },
+        ],
+        { temperature: 0.2, maxTokens: 180 },
+      );
 
-      return completion.content.trim() || fallback;
+      const text = completion.content.trim();
+
+      return text ? { text, byAi: true } : { text: fallback, byAi: false };
     } catch {
-      return fallback;
+      return { text: fallback, byAi: false };
     }
   }
 
-  async generateKnowledgeArticle(subject: string, description: string, solution: string): Promise<{ title: string; summary: string; content: string }> {
-    const fallback = {
-      title: `Solución: ${subject}`,
-      summary: `Solución aplicada a la incidencia: ${subject}.`,
-      content: `Problema:\n${description}\n\nSolución aplicada:\n${solution}`,
-    };
-
-    if (!this.provider.isAvailable()) return fallback;
+  /**
+   * Articulo de la base de conocimiento a partir de un ticket resuelto.
+   *
+   * Devuelve `null` si no lo escribio la IA: un articulo de plantilla con el
+   * asunto y la descripcion copiados no aporta nada a quien lo busque.
+   */
+  async generateKnowledgeArticle(
+    subject: string,
+    description: string,
+    solution: string,
+  ): Promise<{ title: string; summary: string; content: string } | null> {
+    if (!this.provider.isAvailable()) return null;
 
     try {
-      const completion = await this.provider.complete([
-        {
-          role: 'system',
-          content: [
-            'Genera un artículo breve de base de conocimiento para soporte técnico.',
-            'Responde únicamente con JSON válido: {"title":"...","summary":"...","content":"..."}.',
-            'Escribe en español y no inventes pasos que no estén en la información recibida.',
-          ].join('\\n'),
-        },
-        { role: 'user', content: `Incidencia: ${subject}\\nDescripción: ${description}\\nSolución: ${solution}` },
-      ], { temperature: 0.2, maxTokens: 700, validate: (content) => this.parseJson(content) !== null });
-      const parsed = this.parseJson<{ title?: unknown; summary?: unknown; content?: unknown }>(completion.content);
-      if (typeof parsed?.title === 'string' && typeof parsed?.summary === 'string' && typeof parsed?.content === 'string') {
-        return { title: parsed.title.trim(), summary: parsed.summary.trim(), content: parsed.content.trim() };
+      const completion = await this.provider.complete(
+        [
+          {
+            role: 'system',
+            content: [
+              'Genera un artículo breve de base de conocimiento para soporte técnico.',
+              'Responde únicamente con JSON válido: {"title":"...","summary":"...","content":"..."}.',
+              'Escribe en español y no inventes pasos que no estén en la información recibida.',
+              'El artículo debe servir para cualquier cliente: no incluyas nombres de clientes,',
+              'personas, dominios ni datos de contacto, ni en el título ni en el contenido.',
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: `Incidencia: ${subject}\nDescripción: ${description}\nSolución: ${solution}`,
+          },
+        ],
+        { temperature: 0.2, maxTokens: 700, validate: (content) => this.parseJson(content) !== null },
+      );
+
+      const parsed = this.parseJson<{ title?: unknown; summary?: unknown; content?: unknown }>(
+        completion.content,
+      );
+
+      if (
+        typeof parsed?.title === 'string' &&
+        typeof parsed.summary === 'string' &&
+        typeof parsed.content === 'string'
+      ) {
+        return {
+          title: parsed.title.trim(),
+          summary: parsed.summary.trim(),
+          content: parsed.content.trim(),
+        };
       }
     } catch (error) {
-      this.logger.warn(`Artículo automático no disponible: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Artículo automático no disponible: ${this.reason(error)}`);
     }
 
-    return fallback;
+    return null;
   }
+
+  /**
+   * Decide como atender un mensaje de WhatsApp: contestarlo o derivarlo.
+   *
+   * Contesta solo lo que puede resolver con la informacion que recibe; todo lo
+   * que necesita al equipo tecnico lo deriva con los datos del ticket ya
+   * propuestos. Lanza si el proveedor no responde o la respuesta no se
+   * entiende: quien llama trata ese caso como una derivacion.
+   */
+  async decideWhatsappReply(
+    context: WhatsappReplyContext,
+    options: { requireTroubleshoot?: boolean } = {},
+  ): Promise<WhatsappReplyDecision> {
+    const categories = await this.activeCategories();
+    const attemptsLeft = Math.max(context.maxTroubleshootAttempts - context.troubleshootAttempts, 0);
+
+    const messages: AiMessage[] = [
+      {
+        role: 'system',
+        content: [
+          'Eres el asistente virtual de CONIT y atiendes a sus clientes por WhatsApp.',
+          'CONIT desarrolla y mantiene sitios web, sistemas web, aulas virtuales, hosting,',
+          'dominios, correo corporativo y bases de datos.',
+          '',
+          'Tu objetivo es resolver la consulta o dejarla bien encaminada antes de pasarla al',
+          'equipo tecnico. Elige una accion:',
+          '- "reply": saludos, dudas generales, el estado de un ticket, o una pregunta para',
+          '  obtener un dato imprescindible.',
+          '- "troubleshoot": hay un problema. Explica en lenguaje sencillo que podria estar',
+          '  pasando (2 o 3 causas probables) y da de 2 a 4 pasos concretos que el cliente puede',
+          '  probar por su cuenta. Apoyate en la base de conocimiento, en sus servicios y en las',
+          '  comprobaciones automaticas. Termina pidiendole que te diga si se soluciono.',
+          '- "escalate": hace falta el equipo tecnico.',
+          '',
+          'Elige "escalate" cuando:',
+          '- el cliente ya probo los pasos y el problema sigue;',
+          '- no quedan intentos de diagnostico (te lo indico abajo);',
+          '- hace falta acceso que solo tiene CONIT: servidor, hosting, DNS, base de datos o la',
+          '  configuracion del sistema;',
+          '- es critico: el servicio esta caido para todos, hay datos en riesgo o un problema de',
+          '  seguridad;',
+          '- las comprobaciones automaticas muestran un fallo del lado de CONIT: la web no',
+          '  responde o da error del servidor, el certificado vencio, el dominio no resuelve;',
+          '- el cliente pide hablar con una persona o insiste en que lo atiendan.',
+          '',
+          'Reglas para "message":',
+          '- Espanol, cordial y breve, como un WhatsApp. Sin Markdown ni titulos; si das pasos,',
+          '  usa una lista corta con guiones.',
+          '- No saludes otra vez si en la conversacion ya hubo saludo.',
+          '- No inventes datos, plazos ni soluciones que no esten en la informacion recibida.',
+          '- Si el cliente ya describio un problema concreto ("el correo no envia", "la web no',
+          '  carga"), elige "troubleshoot" aunque falten detalles: en ese mismo mensaje da las causas',
+          '  probables y los pasos, y anade al final las preguntas que necesites. No respondas solo',
+          '  con preguntas.',
+          '- Si no sabes ni cual es el problema, pide todo lo que necesites en un solo mensaje y',
+          '  solo una vez. Si ya preguntaste, da causas probables y pasos con lo que tengas.',
+          '- Los adjuntos aparecen como [Audio], [Imagen]...: no puedes verlos; pide que lo',
+          '  describan por escrito.',
+          '- Si eliges "escalate", explica en una o dos frases que podria estar pasando segun lo',
+          '  que sabes. El sistema anade despues el codigo del ticket.',
+          '- Si la conversacion esta en seguimiento (ya derivada), no repitas el diagnostico ni',
+          '  abras otro caso: informa el estado real del ticket y que el equipo lo esta atendiendo.',
+          '  Si el cliente aporta informacion nueva, agradecela y dile que el equipo la vera.',
+          '',
+          'Para "troubleshoot" y "escalate" rellena tambien el ticket: subject, description (que',
+          'ocurre, desde cuando, a que servicio afecta, que probo el cliente y que mostraron las',
+          'comprobaciones), category y priority.',
+          '',
+          'Responde EXCLUSIVAMENTE con un objeto JSON, sin texto alrededor ni bloques de codigo:',
+          '{"action": "reply|troubleshoot|escalate", "message": "<texto para el cliente>", "subject": "<asunto>", "description": "<detalle>", "category": "<nombre exacto de la lista o null>", "priority": "<LOW|MEDIUM|HIGH|CRITICAL>", "reasoning": "<una frase>"}',
+          '',
+          ...PRIORITY_CRITERIA,
+          '',
+          this.catalogue(categories),
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: [
+          `Contacto: ${context.contact}`,
+          '',
+          'Servicios contratados:',
+          context.services || '(no constan servicios)',
+          '',
+          'Comprobaciones automaticas hechas ahora mismo por CONIT:',
+          context.diagnostics || '(no se hicieron comprobaciones)',
+          '',
+          'Tickets abiertos del cliente:',
+          context.openTickets || '(ninguno)',
+          '',
+          `Seguimiento: ${context.followUp || 'no; la conversacion no se ha derivado todavia.'}`,
+          '',
+          `Intentos de diagnostico ya hechos: ${context.troubleshootAttempts} de ${context.maxTroubleshootAttempts}` +
+            (attemptsLeft === 0 ? ' (no quedan: si el problema sigue, deriva).' : '.'),
+          '',
+          'Base de conocimiento relacionada:',
+          context.knowledge || '(sin articulos relacionados)',
+          '',
+          'Conversacion, de la mas antigua a la mas reciente:',
+          context.transcript,
+          ...(options.requireTroubleshoot
+            ? [
+                '',
+                'IMPORTANTE: el cliente describio un problema y todavia no se ha intentado ningun',
+                'diagnostico. Responde con action "troubleshoot": explica las causas probables y da',
+                'pasos concretos para probar; al final anade las preguntas que necesites.',
+              ]
+            : []),
+        ].join('\n'),
+      },
+    ];
+
+    const completion = await this.provider.complete(messages, {
+      temperature: 0.2,
+      maxTokens: 1200,
+      validate: (content) => this.parseJson(content) !== null,
+    });
+
+    const parsed = this.parseJson<{
+      action?: unknown;
+      message?: unknown;
+      subject?: unknown;
+      description?: unknown;
+      category?: unknown;
+      priority?: unknown;
+      reasoning?: unknown;
+    }>(completion.content);
+
+    const reasoning =
+      typeof parsed?.reasoning === 'string' && parsed.reasoning.trim()
+        ? parsed.reasoning.trim()
+        : 'El modelo no incluyo una justificacion.';
+
+    const message = typeof parsed?.message === 'string' ? parsed.message.trim() : '';
+    const requested = parsed?.action;
+
+    // Una respuesta sin texto no sirve para contestar: se trata como derivacion.
+    const action: WhatsappAiAction =
+      (requested === 'reply' || requested === 'troubleshoot') && message
+        ? requested
+        : 'escalate';
+
+    const subject = typeof parsed?.subject === 'string' ? parsed.subject.trim() : '';
+    const description = typeof parsed?.description === 'string' ? parsed.description.trim() : '';
+    const matched = this.matchCategory(categories, parsed?.category);
+
+    return {
+      action,
+      message,
+      reasoning,
+      model: completion.model,
+      draft:
+        action === 'reply' && !subject && !description
+          ? null
+          : {
+              subject,
+              description,
+              priority: this.toPriority(parsed?.priority),
+              categoryId: matched?.id ?? null,
+              categoryName: matched?.name ?? null,
+              reasoning,
+              model: completion.model,
+            },
+    };
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Redactar una respuesta desde un ticket
+   * ------------------------------------------------------------------------ */
 
   async suggestReply(idOrCode: string, dto: SuggestReplyDto): Promise<AiSuggestion> {
     const context = await this.buildContext(idOrCode);
@@ -219,20 +545,12 @@ export class AiService {
         where: { id: ticketId },
         select: { subject: true, description: true },
       }),
-      this.prisma.category.findMany({
-        where: { status: 'ACTIVE' },
-        select: { id: true, name: true, description: true },
-        orderBy: { name: 'asc' },
-      }),
+      this.activeCategories(),
     ]);
 
     if (!ticket) {
       throw new NotFoundException('El ticket no existe');
     }
-
-    const catalogue = categories
-      .map((category) => `- ${category.name}${category.description ? `: ${category.description}` : ''}`)
-      .join('\n');
 
     const messages: AiMessage[] = [
       {
@@ -243,15 +561,9 @@ export class AiService {
           'Responde EXCLUSIVAMENTE con un objeto JSON, sin texto alrededor ni bloques de codigo:',
           '{"category": "<nombre exacto de la lista o null>", "priority": "<LOW|MEDIUM|HIGH|CRITICAL>", "reasoning": "<una frase>"}',
           '',
-          'Criterio de prioridad:',
-          '- CRITICAL: servicio caido o datos en riesgo; afecta a todos los usuarios.',
-          '- HIGH: funcion importante rota, con impacto en el trabajo diario.',
-          '- MEDIUM: problema acotado o con solucion alternativa.',
-          '- LOW: consulta, mejora o incidencia cosmetica.',
+          ...PRIORITY_CRITERIA,
           '',
-          categories.length > 0
-            ? `Categorias disponibles (usa el nombre exacto):\n${catalogue}`
-            : 'No hay categorias disponibles: devuelve null en "category".',
+          this.catalogue(categories),
         ].join('\n'),
       },
       {
@@ -272,16 +584,82 @@ export class AiService {
       completion.content,
     );
 
-    const matched = categories.find(
-      (category) =>
-        typeof parsed?.category === 'string' &&
-        category.name.toLowerCase() === parsed.category.trim().toLowerCase(),
-    );
+    const matched = this.matchCategory(categories, parsed?.category);
 
     return {
       categoryId: matched?.id ?? null,
       categoryName: matched?.name ?? null,
       priority: this.toPriority(parsed?.priority),
+      reasoning:
+        typeof parsed?.reasoning === 'string' && parsed.reasoning.trim()
+          ? parsed.reasoning.trim()
+          : 'El modelo no incluyo una justificacion.',
+      model: completion.model,
+    };
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Proponer un ticket desde un chat
+   * ------------------------------------------------------------------------ */
+
+  /**
+   * Propone asunto, descripcion, prioridad y categoria a partir de una
+   * conversacion de WhatsApp.
+   *
+   * Igual que al clasificar, la categoria se elige del catalogo real y se
+   * valida contra el: un nombre inventado se descarta en lugar de colarse.
+   * Los limites de longitud del ticket los aplica quien llama.
+   */
+  async draftTicketFromChat(contact: string, transcript: string): Promise<AiTicketDraft> {
+    const categories = await this.activeCategories();
+
+    const messages: AiMessage[] = [
+      {
+        role: 'system',
+        content: [
+          'Conviertes conversaciones de WhatsApp con clientes de CONIT en tickets de soporte tecnico.',
+          'CONIT desarrolla y mantiene sitios web, sistemas web, aulas virtuales, hosting, dominios,',
+          'correo corporativo y bases de datos.',
+          '',
+          'Responde EXCLUSIVAMENTE con un objeto JSON, sin texto alrededor ni bloques de codigo:',
+          '{"subject": "<asunto breve, maximo 120 caracteres>", "description": "<detalle para el equipo tecnico>", "category": "<nombre exacto de la lista o null>", "priority": "<LOW|MEDIUM|HIGH|CRITICAL>", "reasoning": "<una frase>"}',
+          '',
+          'La descripcion debe decir que ocurre, desde cuando, a que servicio afecta y que ha probado',
+          'el cliente, solo con lo que aparezca en la conversacion. No inventes datos. Escribe en espanol.',
+          '',
+          ...PRIORITY_CRITERIA,
+          '',
+          this.catalogue(categories),
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: `Contacto: ${contact}\n\nConversacion:\n${transcript}`,
+      },
+    ];
+
+    const completion = await this.provider.complete(messages, {
+      temperature: 0.2,
+      maxTokens: 700,
+      validate: (content) => this.parseJson(content) !== null,
+    });
+
+    const parsed = this.parseJson<{
+      subject?: unknown;
+      description?: unknown;
+      category?: unknown;
+      priority?: unknown;
+      reasoning?: unknown;
+    }>(completion.content);
+
+    const matched = this.matchCategory(categories, parsed?.category);
+
+    return {
+      subject: typeof parsed?.subject === 'string' ? parsed.subject.trim() : '',
+      description: typeof parsed?.description === 'string' ? parsed.description.trim() : '',
+      priority: this.toPriority(parsed?.priority),
+      categoryId: matched?.id ?? null,
+      categoryName: matched?.name ?? null,
       reasoning:
         typeof parsed?.reasoning === 'string' && parsed.reasoning.trim()
           ? parsed.reasoning.trim()
@@ -421,13 +799,65 @@ export class AiService {
 
     if (start === -1 || end <= start) return null;
 
-    try {
-      return JSON.parse(content.slice(start, end + 1)) as T;
-    } catch {
-      this.logger.warn('El modelo devolvio un JSON que no se pudo interpretar');
+    const candidate = content.slice(start, end + 1);
 
-      return null;
+    // Primero tal cual; si falla, con los saltos de linea de los textos
+    // escapados, que es el error mas habitual de los modelos.
+    for (const attempt of [candidate, escapeControlCharacters(candidate)]) {
+      try {
+        return JSON.parse(attempt) as T;
+      } catch {
+        // Se prueba la siguiente variante.
+      }
     }
+
+    this.logger.warn('El modelo devolvio un JSON que no se pudo interpretar');
+
+    return null;
+  }
+
+  /** Motivo legible de un fallo, para el registro. */
+  private reason(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  /** Categorias que el modelo puede proponer. */
+  private activeCategories(): Promise<CatalogueCategory[]> {
+    return this.prisma.category.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, name: true, description: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  /** Catalogo de categorias tal como se le presenta al modelo. */
+  private catalogue(categories: CatalogueCategory[]): string {
+    if (categories.length === 0) {
+      return 'No hay categorias disponibles: devuelve null en "category".';
+    }
+
+    const lines = categories.map(
+      (category) => `- ${category.name}${category.description ? `: ${category.description}` : ''}`,
+    );
+
+    return `Categorias disponibles (usa el nombre exacto):\n${lines.join('\n')}`;
+  }
+
+  /**
+   * Categoria propuesta, solo si existe de verdad.
+   *
+   * Un modelo puede inventarse un nombre plausible que no corresponda a
+   * ninguna fila; en ese caso se devuelve `undefined` en lugar de colarlo.
+   */
+  private matchCategory(
+    categories: CatalogueCategory[],
+    proposed: unknown,
+  ): CatalogueCategory | undefined {
+    if (typeof proposed !== 'string') return undefined;
+
+    const name = proposed.trim().toLowerCase();
+
+    return categories.find((category) => category.name.toLowerCase() === name);
   }
 
   /** Prioridad valida; ante cualquier otra cosa, la neutra. */

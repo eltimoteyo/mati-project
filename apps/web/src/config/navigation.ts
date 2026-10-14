@@ -5,11 +5,13 @@ import {
   ChartColumn,
   Headphones,
   History,
+  Inbox,
   LayoutDashboard,
   type LucideIcon,
   MessageSquare,
   Settings,
   Sparkles,
+  Tags,
   Ticket,
   Users,
 } from 'lucide-react';
@@ -32,7 +34,7 @@ export interface NavSection {
  * Estructura de navegacion del panel administrativo.
  *
  * Los modulos estan agrupados por proposito en lugar de listados en plano:
- * con trece entradas, la agrupacion es lo que mantiene la barra legible.
+ * con catorce entradas, la agrupacion es lo que mantiene la barra legible.
  * Cada entrada ya tiene ruta; su contenido llega en fases posteriores.
  */
 export const navigation: NavSection[] = [
@@ -50,6 +52,12 @@ export const navigation: NavSection[] = [
   {
     title: 'Operacion',
     items: [
+      {
+        label: 'Bandeja',
+        href: '/admin/bandeja',
+        icon: Inbox,
+        description: 'Mensajes de WhatsApp de los clientes, para responder o convertir en ticket.',
+      },
       {
         label: 'Tickets',
         href: '/admin/tickets',
@@ -76,10 +84,12 @@ export const navigation: NavSection[] = [
           'Webs, sistemas, aulas virtuales, hosting, dominios, correos y bases de datos.',
       },
       {
-        label: 'IA Soporte',
+        // La ruta conserva su nombre antiguo para no romper enlaces guardados.
+        label: 'Categorias y SLA',
         href: '/admin/ia-soporte',
-        icon: Sparkles,
-        description: 'Clasificacion automatica de incidencias por la IA.',
+        icon: Tags,
+        description:
+          'Clasificacion de incidencias y tiempos objetivo de atencion. Es el catalogo que usa la IA al clasificar.',
       },
     ],
   },
@@ -96,7 +106,7 @@ export const navigation: NavSection[] = [
         label: 'IA Soporte Automática',
         href: '/admin/ia',
         icon: Sparkles,
-        description: 'Respuestas automáticas y creación inteligente de tickets.',
+        description: 'Respuesta automatica por WhatsApp y asistente de los tickets.',
       },
       {
         label: 'Base de conocimiento',

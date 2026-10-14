@@ -2,6 +2,7 @@
 
 import {
   type Message,
+  MESSAGE_SOURCES,
   MESSAGE_VISIBILITIES,
   type MessageVisibility,
   type UserRef,
@@ -35,6 +36,7 @@ import {
   MessagesSquareIcon,
   PencilIcon,
   SendIcon,
+  SparklesIcon,
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
@@ -71,16 +73,25 @@ function MessageBubble({
   onDelete: () => void;
 }) {
   const isInternal = message.visibility === MESSAGE_VISIBILITIES.INTERNAL;
+  const isAi = message.source === MESSAGE_SOURCES.AI;
 
   return (
     <li className="flex gap-3">
       <Avatar className="mt-0.5 size-8 shrink-0">
-        <AvatarFallback>{getInitials(message.author?.name ?? '?')}</AvatarFallback>
+        <AvatarFallback className={cn(isAi && 'text-primary')}>
+          {isAi ? <SparklesIcon className="size-4" aria-hidden="true" /> : getInitials(message.author?.name ?? '?')}
+        </AvatarFallback>
       </Avatar>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{message.author?.name ?? 'Sistema'}</span>
+          <span className="text-sm font-medium">
+            {isAi ? 'Asistente IA' : (message.author?.name ?? 'Sistema')}
+          </span>
+
+          {/* Lo que escribio la IA se marca: el equipo debe saber que esa
+              respuesta no la reviso ninguna persona antes de enviarla. */}
+          {isAi ? <Badge variant="info">Respuesta automatica</Badge> : null}
 
           {/* Las notas internas se marcan siempre: confundirlas con una
               respuesta al cliente seria un error costoso. */}
