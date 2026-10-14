@@ -155,6 +155,29 @@ export const envSchema = z.object({
   /** Desactiva el envio sin tener que borrar las credenciales. */
   WHATSAPP_ENABLED: envBoolean(true),
 
+  // --- WhatsApp (Meta Cloud API) — opcional ----------------------------------
+  // Avisos al cliente cuando su ticket llega a un estado final. Sin token o sin
+  // identificador de numero, el aviso se omite y el resto funciona igual.
+  WHATSAPP_ACCESS_TOKEN: z.string().trim().optional(),
+  /** Identificador del numero remitente en Meta; no es el numero de telefono. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
+  /** Version de la Graph API. Meta retira las antiguas cada cierto tiempo. */
+  WHATSAPP_GRAPH_VERSION: z
+    .string()
+    .trim()
+    .regex(/^v\d+\.\d+$/, { message: 'Formato de version invalido. Usa por ejemplo v26.0.' })
+    .default('v26.0'),
+  /**
+   * Plantilla del aviso de estado final.
+   *
+   * Tiene que existir y estar aprobada en Meta con tres variables en el
+   * cuerpo: codigo, asunto y estado. Si Meta la rechaza, el aviso sale como
+   * texto libre, que solo llega si el cliente escribio en las ultimas 24 horas.
+   */
+  WHATSAPP_TEMPLATE_TICKET_STATUS: z.string().trim().min(1).default('ticket_actualizacion'),
+  /** Codigo de idioma con el que se aprobo la plantilla. */
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().trim().min(1).default('es'),
+
   /**
    * Carpeta donde se guardan los ficheros subidos (fotos de perfil).
    *

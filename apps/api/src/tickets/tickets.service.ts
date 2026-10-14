@@ -35,6 +35,7 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma, type Ticket } from '../generated/prisma/client';
 import { TicketMailService } from '../mail/ticket-mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TicketWhatsappService } from '../whatsapp/ticket-whatsapp.service';
 import type { CreateTicketDto } from './dto/create-ticket.dto';
 import type { TicketQueryDto } from './dto/ticket-query.dto';
 import type { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -62,6 +63,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly ticketMail: TicketMailService,
+    private readonly ticketWhatsapp: TicketWhatsappService,
     @Inject(forwardRef(() => AiService)) private readonly aiService: AiService,
   ) {}
 
@@ -261,7 +263,18 @@ export class TicketsService {
       await this.notifyOnUpdate(tx, current, dto, actorId);
     });
 
-    // Solo la resolucion se comunica al cliente. Los estados intermedios son
+    // El aviso por WhatsApp sale al llegar a un estado final. Cerrar un ticket
+    // que ya estaba resuelto no avisa de nuevo: el cliente ya lo supo al
+    // resolverse y un segundo mensaje no le diria nada.
+    if (
+      dto.status &&
+      dto.status !== current.status &&
+      (dto.status === 'RESOLVED' || (dto.status === 'CLOSED' && current.status !== 'RESOLVED'))
+    ) {
+      await this.ticketWhatsapp.sendTicketStatus(current.id);
+    }
+
+    // Por correo solo se comunica la resolucion. Los estados intermedios son
     // informacion de proceso: enviarlos convertiria su buzon en un registro de
     // auditoria y acabaria en la carpeta de correo no deseado.
     if (dto.status === 'RESOLVED' && current.status !== 'RESOLVED') {

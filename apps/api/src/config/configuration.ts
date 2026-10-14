@@ -101,6 +101,21 @@ export function configuration() {
       /** Numero de WhatsApp de CONIT, con prefijo `whatsapp:`. */
       fromNumber: env.TWILIO_WHATSAPP_NUMBER,
       enabled: env.WHATSAPP_ENABLED && Boolean(env.TWILIO_ACCOUNT_SID) && Boolean(env.TWILIO_AUTH_TOKEN),
+      /**
+       * Avisos salientes por la Cloud API de Meta. Es independiente de la
+       * recepcion por Twilio: cada una se activa con sus propias credenciales.
+       */
+      cloud: {
+        accessToken: env.WHATSAPP_ACCESS_TOKEN,
+        phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+        graphVersion: env.WHATSAPP_GRAPH_VERSION,
+        ticketStatusTemplate: env.WHATSAPP_TEMPLATE_TICKET_STATUS,
+        templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE,
+        enabled:
+          env.WHATSAPP_ENABLED &&
+          Boolean(env.WHATSAPP_ACCESS_TOKEN) &&
+          Boolean(env.WHATSAPP_PHONE_NUMBER_ID),
+      },
     },
 
     uploads: {

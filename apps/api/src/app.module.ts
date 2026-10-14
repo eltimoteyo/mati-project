@@ -28,6 +28,7 @@ import { ReportsModule } from './reports/reports.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { WhatsappCloudModule } from './whatsapp/whatsapp-cloud.module';
 
 /**
  * Modulo raiz.
@@ -74,6 +75,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     MailModule,
     AiModule,
     WhatsappModule,
+    WhatsappCloudModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
