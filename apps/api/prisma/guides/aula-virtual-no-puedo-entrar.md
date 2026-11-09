@@ -3,6 +3,11 @@ title: No puedo entrar al aula virtual
 slug: aula-virtual-no-puedo-entrar
 category: aula-virtual
 summary: Problemas de acceso más comunes en la plataforma educativa y cómo resolverlos.
+
+servicio: VIRTUAL_CLASSROOM
+sintomas: aula virtual no puedo entrar
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

@@ -3,6 +3,11 @@ title: El sistema muestra un error o no guarda los cambios
 slug: sistema-web-error-al-guardar
 category: sistema-web
 summary: Qué hacer cuando un formulario falla al guardar o aparece un mensaje de error en el sistema.
+
+servicio: WEB_SYSTEM
+sintomas: sistema web error al guardar
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

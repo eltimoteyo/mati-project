@@ -117,7 +117,7 @@ export class InboxService {
 
         // En segundo plano: Meta espera la respuesta al webhook en segundos y
         // la IA puede tardar bastante mas.
-        this.autoReply.schedule(conversationId);
+        // El trabajo se guardó en la misma transacción que el mensaje.
       }
     }
 
@@ -167,6 +167,7 @@ export class InboxService {
       where: { id },
       include: {
         client: { select: { id: true, name: true } },
+        cases: { orderBy: { startedAt: 'desc' }, take: 1 },
         // Los mas recientes, que son los que importan; se reordenan abajo.
         messages: {
           orderBy: { createdAt: 'desc' },
@@ -189,6 +190,16 @@ export class InboxService {
       // Un chat se lee de arriba abajo.
       messages: [...conversation.messages].reverse().map(toInboxMessage),
       tickets: conversation.tickets.map(toInboxTicketRef),
+      supportCase: conversation.cases[0]
+        ? {
+            id: conversation.cases[0].id,
+            stage: conversation.cases[0].stage,
+            summary: conversation.cases[0].summary,
+            facts: conversation.cases[0].facts as Record<string, unknown>,
+            stepsTried: conversation.cases[0].stepsTried as Array<{ step: string; result: string }>,
+            attempts: conversation.cases[0].attempts,
+          }
+        : null,
     };
   }
 
@@ -231,6 +242,8 @@ export class InboxService {
       );
     }
 
+    // Pausar antes de la llamada externa evita que el trabajador se adelante.
+    await this.conversations.pauseAi(conversation.id, new Date(Date.now() + HANDOFF_MS));
     const result = await this.whatsappCloud.sendText({ to: conversation.phone, body: dto.body });
 
     if (!result.sent) {
@@ -264,7 +277,7 @@ export class InboxService {
     );
 
     // Al reanudar, si el contacto escribio y nadie le contesto, se atiende ya.
-    if (!paused) this.autoReply.schedule(conversation.id);
+    if (!paused) await this.autoReply.schedule(conversation.id);
 
     return this.findOne(conversation.id);
   }
@@ -292,7 +305,12 @@ export class InboxService {
     if (!conversation.clientId) {
       await this.prisma.whatsappConversation.update({
         where: { id: conversation.id },
-        data: { clientId: dto.clientId },
+        data: {
+          clientId: dto.clientId,
+          identityStatus: 'VERIFIED',
+          identifiedBy: 'AGENT',
+          identifiedAt: new Date(),
+        },
       });
     }
 

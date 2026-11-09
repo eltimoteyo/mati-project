@@ -72,6 +72,7 @@ export function toInboxConversation(
     unreadCount: conversation.unreadCount,
     aiPaused: conversation.aiPausedUntil !== null && conversation.aiPausedUntil > now,
     aiPausedUntil: conversation.aiPausedUntil?.toISOString() ?? null,
+    identityStatus: conversation.identityStatus,
   };
 }
 
@@ -85,6 +86,11 @@ export function toInboxMessage(message: InboxMessageRecord): InboxMessage {
     error: message.error,
     author: toUserRef(message.author),
     aiGenerated: message.aiGenerated,
+    mediaAvailable: Boolean(message.mediaPath),
+    mimeType: message.mimeType,
+    transcript: message.transcript,
+    feedback: message.feedback,
+    feedbackReason: message.feedbackReason,
     createdAt: message.createdAt.toISOString(),
   };
 }

@@ -17,11 +17,7 @@ import { MessageCircleIcon, PanelRightOpenIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { PageHeader } from '@/components/common/page-header';
-import {
-  useInboxConversation,
-  useInboxConversations,
-  useMarkInboxRead,
-} from '@/hooks/use-inbox';
+import { useInboxConversation, useInboxConversations, useMarkInboxRead } from '@/hooks/use-inbox';
 
 import { InboxChat } from './inbox-chat';
 import { InboxConversationList } from './inbox-conversation-list';
@@ -37,10 +33,14 @@ const LIST_SIZE = 50;
  * acciones pasan a un panel deslizante desde la cabecera del chat, y en movil
  * se ve una sola columna cada vez.
  */
-export function InboxView() {
+export function InboxView({
+  initialConversationId = null,
+}: {
+  initialConversationId?: string | null;
+}) {
   const [search, setSearch] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialConversationId);
 
   const list = useInboxConversations({
     pageSize: LIST_SIZE,

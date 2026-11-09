@@ -58,6 +58,18 @@ export const VALIDATION_RULES = {
   whatsapp: {
     body: { minLength: 1, maxLength: 4096 },
   },
+  /** Limites de la IA editables desde el panel. */
+  aiLimits: {
+    agentMaxTokens: { min: 1000, max: 32_000 },
+    minResponseTokens: { min: 0, max: 8000 },
+    turnTimeoutSeconds: { min: 30, max: 300 },
+    maxToolRounds: { min: 2, max: 8 },
+    concurrentConversations: { min: 1, max: 5 },
+    replyDelaySeconds: { min: 2, max: 30 },
+    maxRepliesPerHour: { min: 3, max: 30 },
+    dailyBudgetUsd: { min: 0, max: 1000 },
+    priceUsdPerMillion: { min: 0, max: 500 },
+  },
   pagination: {
     defaultPageSize: 20,
     maxPageSize: 100,

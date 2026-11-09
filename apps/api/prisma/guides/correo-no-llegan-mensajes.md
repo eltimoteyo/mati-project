@@ -3,6 +3,11 @@ title: No me llegan correos al buzón corporativo
 slug: correo-no-llegan-mensajes
 category: correo-corporativo
 summary: Qué revisar cuando faltan correos que deberían haber llegado al buzón de la empresa.
+
+servicio: EMAIL
+sintomas: correo no llegan mensajes
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

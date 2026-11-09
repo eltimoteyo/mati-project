@@ -3,6 +3,11 @@ title: La página web no carga o muestra un error
 slug: web-no-carga
 category: pagina-web
 summary: Cómo distinguir si la web está caída para todos o solo para ti, y qué hacer en cada caso.
+
+servicio: WEBSITE
+sintomas: web no carga
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

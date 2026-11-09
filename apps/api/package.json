@@ -9,8 +9,11 @@
     "dev": "prisma generate && nest start --watch",
     "start": "node dist/main.js",
     "start:prod": "prisma migrate deploy && node dist/main.js",
-    "lint": "eslint src prisma",
+    "lint": "eslint src prisma tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ai:evaluate": "tsx scripts/evaluate-support.mts",
     "clean": "rimraf dist .turbo *.tsbuildinfo",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev && prisma generate",
@@ -50,6 +53,7 @@
   },
   "devDependencies": {
     "@conit/config": "workspace:*",
+    "@electric-sql/pglite": "^0.5.15",
     "@nestjs/cli": "11.0.24",
     "@nestjs/schematics": "11.0.9",
     "@nestjs/testing": "11.2.3",
@@ -63,6 +67,7 @@
     "rimraf": "6.0.1",
     "ts-node": "10.9.2",
     "tsconfig-paths": "4.2.0",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "vitest": "^5.1.0"
   }
 }

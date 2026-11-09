@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 
+import { join } from 'node:path';
+
 import { API_ERROR_CODES } from '@conit/types';
 import {
   BadRequestException,
@@ -75,8 +77,9 @@ async function bootstrap(): Promise<void> {
    * fuerzan que el navegador los trate como datos: sin `nosniff`, un fichero
    * manipulado podria intentar ejecutarse como script en el dominio.
    */
-  app.useStaticAssets(configService.get('uploads', { infer: true }).dir, {
-    prefix: '/uploads/',
+  // Solo avatares son públicos. Los adjuntos de WhatsApp requieren sesión de administrador.
+  app.useStaticAssets(join(configService.get('uploads', { infer: true }).dir, 'avatars'), {
+    prefix: '/uploads/avatars/',
     index: false,
     dotfiles: 'deny',
     setHeaders: (response) => {

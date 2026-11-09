@@ -85,6 +85,7 @@ model Client {
   projects              Project[]
   tickets               Ticket[]
   whatsappConversations WhatsappConversation[]
+  contacts              ClientContact[]
 
   @@index([status])
   @@index([name])
@@ -108,6 +109,7 @@ model Project {
   updatedAt   DateTime      @updatedAt @map("updated_at")
   client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tickets     Ticket[]
+  technical   Json? // Proveedor, IP esperada, DNS y selector DKIM; nunca secretos.
 
   @@index([clientId])
   @@index([status])
@@ -133,6 +135,7 @@ model Category {
   updatedAt             DateTime       @updatedAt @map("updated_at")
   articles              Article[]
   tickets               Ticket[]
+  defaultAssigneeId     String?        @map("default_assignee_id") @db.Uuid
 
   @@index([status])
   @@map("categories")
@@ -171,6 +174,9 @@ model Ticket {
   createdBy              User?                 @relation("TicketCreatedBy", fields: [createdById], references: [id])
   project                Project?              @relation(fields: [projectId], references: [id])
   whatsappConversation   WhatsappConversation? @relation(fields: [whatsappConversationId], references: [id], onDelete: SetNull)
+  supportCases           SupportCase[]
+  satisfaction           Int?
+  satisfactionComment    String?               @map("satisfaction_comment") @db.VarChar(500)
 
   @@index([status])
   @@index([priority])
@@ -233,20 +239,22 @@ model Message {
 
 /// Articulo de ayuda o solucion a incidencias comunes.
 model Article {
-  id          String    @id @default(uuid()) @db.Uuid
-  title       String    @db.VarChar(200)
+  id          String         @id @default(uuid()) @db.Uuid
+  title       String         @db.VarChar(200)
   /// Identificador amigable en minusculas para URLs limpias.
-  slug        String    @unique @db.VarChar(220)
-  summary     String?   @db.VarChar(500)
+  slug        String         @unique @db.VarChar(220)
+  summary     String?        @db.VarChar(500)
   content     String
-  categoryId  String?   @map("category_id") @db.Uuid
-  authorId    String?   @map("author_id") @db.Uuid
-  isPublished Boolean   @default(true) @map("is_published")
-  viewsCount  Int       @default(0) @map("views_count")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  author      User?     @relation(fields: [authorId], references: [id])
-  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  String?        @map("category_id") @db.Uuid
+  authorId    String?        @map("author_id") @db.Uuid
+  isPublished Boolean        @default(true) @map("is_published")
+  viewsCount  Int            @default(0) @map("views_count")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  author      User?          @relation(fields: [authorId], references: [id])
+  category    Category?      @relation(fields: [categoryId], references: [id])
+  guidance    Json?
+  chunks      ArticleChunk[]
 
   @@index([categoryId])
   @@index([authorId])
@@ -290,26 +298,33 @@ model NotificationPreference {
 /// Se agrupa por numero y no por cliente: un mensaje puede llegar de un numero
 /// que no esta en ninguna ficha, y aun asi hay que poder atenderlo.
 model WhatsappConversation {
-  id            String            @id @default(uuid()) @db.Uuid
+  id             String              @id @default(uuid()) @db.Uuid
   /// Numero tal como lo identifica Meta: solo digitos, con codigo de pais.
-  phone         String            @unique @db.VarChar(32)
+  phone          String              @unique @db.VarChar(32)
   /// Nombre del perfil de WhatsApp. Lo elige el contacto, no CONIT.
-  profileName   String?           @map("profile_name") @db.VarChar(120)
+  profileName    String?             @map("profile_name") @db.VarChar(120)
   /// Cliente al que pertenece el numero; null mientras sea desconocido.
-  clientId      String?           @map("client_id") @db.Uuid
+  clientId       String?             @map("client_id") @db.Uuid
   /// Ultimo mensaje del contacto: abre la ventana de 24 horas para responder.
-  lastInboundAt DateTime?         @map("last_inbound_at")
-  lastMessageAt DateTime          @default(now()) @map("last_message_at")
+  lastInboundAt  DateTime?           @map("last_inbound_at")
+  lastMessageAt  DateTime            @default(now()) @map("last_message_at")
   /// Mensajes del contacto que nadie del equipo ha abierto todavia.
-  unreadCount   Int               @default(0) @map("unread_count")
+  unreadCount    Int                 @default(0) @map("unread_count")
   /// La respuesta automatica no actua hasta esta fecha: alguien del equipo
   /// tomo la conversacion o la IA la derivo a un ticket.
-  aiPausedUntil DateTime?         @map("ai_paused_until")
-  createdAt     DateTime          @default(now()) @map("created_at")
-  updatedAt     DateTime          @updatedAt @map("updated_at")
-  client        Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  messages      WhatsappMessage[]
-  tickets       Ticket[]
+  aiPausedUntil  DateTime?           @map("ai_paused_until")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  client         Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  messages       WhatsappMessage[]
+  tickets        Ticket[]
+  identityStatus IdentityStatus      @default(UNKNOWN) @map("identity_status")
+  identifiedBy   String?             @map("identified_by") @db.VarChar(20)
+  identifiedAt   DateTime?           @map("identified_at")
+  cases          SupportCase[]
+  job            AutoReplyJob?
+  challenges     IdentityChallenge[]
+  turns          AiTurn[]
 
   @@index([lastMessageAt])
   @@index([clientId])
@@ -341,6 +356,13 @@ model WhatsappMessage {
   createdAt      DateTime                 @default(now()) @map("created_at")
   conversation   WhatsappConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   author         User?                    @relation(fields: [authorId], references: [id])
+  mediaId        String?                  @map("media_id") @db.VarChar(200)
+  mimeType       String?                  @map("mime_type") @db.VarChar(100)
+  mediaPath      String?                  @map("media_path") @db.VarChar(300)
+  transcript     String?
+  mediaProcessed Boolean                  @default(false) @map("media_processed")
+  feedback       Int?
+  feedbackReason String?                  @map("feedback_reason") @db.VarChar(500)
 
   @@index([conversationId, createdAt])
   @@map("whatsapp_messages")
@@ -350,6 +372,144 @@ model WhatsappMessage {
 ///
 /// Clave y valor JSON: cada ajuste tiene su propia forma, que valida el
 /// servicio que lo usa.
+enum IdentityStatus {
+  UNKNOWN
+  CLAIMED
+  VERIFIED
+}
+
+enum SupportStage {
+  IDENTIFYING
+  TRIAGE
+  TROUBLESHOOTING
+  ESCALATED
+  FOLLOW_UP
+  RESOLVED
+  ABANDONED
+}
+
+model ClientContact {
+  id         String    @id @default(uuid()) @db.Uuid
+  clientId   String    @map("client_id") @db.Uuid
+  name       String    @db.VarChar(120)
+  phone      String    @db.VarChar(32)
+  email      String?   @db.VarChar(180)
+  role       String?   @db.VarChar(100)
+  verifiedAt DateTime? @map("verified_at")
+  deletedAt  DateTime? @map("deleted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, phone])
+  @@index([phone])
+  @@map("client_contacts")
+}
+
+model SupportCase {
+  id             String               @id @default(uuid()) @db.Uuid
+  conversationId String               @map("conversation_id") @db.Uuid
+  clientId       String?              @map("client_id") @db.Uuid
+  ticketId       String?              @map("ticket_id") @db.Uuid
+  stage          SupportStage         @default(IDENTIFYING)
+  facts          Json                 @default("{}")
+  stepsTried     Json                 @default("[]") @map("steps_tried")
+  summary        String               @default("")
+  solution       String?
+  attempts       Int                  @default(0)
+  startedAt      DateTime             @default(now()) @map("started_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  lastInboundAt  DateTime             @default(now()) @map("last_inbound_at")
+  closedAt       DateTime?            @map("closed_at")
+  conversation   WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  ticket         Ticket?              @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  turns          AiTurn[]
+
+  @@index([conversationId, closedAt])
+  @@map("support_cases")
+}
+
+model AutoReplyJob {
+  conversationId String               @id @map("conversation_id") @db.Uuid
+  runAt          DateTime             @map("run_at")
+  attempts       Int                  @default(0)
+  version        Int                  @default(1)
+  lockedAt       DateTime?            @map("locked_at")
+  lockToken      String?              @map("lock_token") @db.Uuid
+  conversation   WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([runAt])
+  @@map("auto_reply_jobs")
+}
+
+model IdentityChallenge {
+  id             String               @id @default(uuid()) @db.Uuid
+  conversationId String               @map("conversation_id") @db.Uuid
+  clientId       String               @map("client_id") @db.Uuid
+  codeHash       String               @map("code_hash") @db.Char(64)
+  attempts       Int                  @default(0)
+  expiresAt      DateTime             @map("expires_at")
+  consumedAt     DateTime?            @map("consumed_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  conversation   WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("identity_challenges")
+}
+
+model AiTurn {
+  id             String               @id @default(uuid()) @db.Uuid
+  conversationId String               @map("conversation_id") @db.Uuid
+  caseId         String?              @map("case_id") @db.Uuid
+  model          String
+  latencyMs      Int                  @map("latency_ms")
+  inputTokens    Int                  @default(0) @map("input_tokens")
+  outputTokens   Int                  @default(0) @map("output_tokens")
+  cost           Float? // USD informado por el proveedor; null cuando no se conoce.
+  action         String               @db.VarChar(30)
+  error          String?              @db.VarChar(300)
+  tools          Json                 @default("[]")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  conversation   WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  supportCase    SupportCase?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([conversationId, createdAt])
+  @@map("ai_turns")
+}
+
+model ArticleChunk {
+  id        String  @id @default(uuid()) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  position  Int
+  content   String
+  embedding Json? // Portable; pgvector puede habilitarse mediante el script opcional.
+  model     String?
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, position])
+  @@map("article_chunks")
+}
+
+model DiagnosticCache {
+  key       String   @id @db.VarChar(300)
+  result    Json
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("diagnostic_cache")
+}
+
+model ServiceIncident {
+  id       String    @id @default(uuid()) @db.Uuid
+  host     String    @db.VarChar(250)
+  summary  String
+  openedAt DateTime  @default(now()) @map("opened_at")
+  closedAt DateTime? @map("closed_at")
+
+  @@index([host, closedAt])
+  @@map("service_incidents")
+}
+
 model AppSetting {
   key       String   @id @db.VarChar(80)
   value     Json

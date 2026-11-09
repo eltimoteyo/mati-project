@@ -3,6 +3,11 @@ title: Se borró información por error o faltan datos
 slug: recuperar-informacion-borrada
 category: base-de-datos
 summary: Qué hacer de inmediato si desaparecieron registros o archivos del sistema.
+
+servicio: DATABASE
+sintomas: recuperar informacion borrada
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

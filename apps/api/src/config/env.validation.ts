@@ -96,6 +96,39 @@ export const envSchema = z.object({
   // Todas opcionales: sin clave, el modulo se declara no disponible y el resto
   // del sistema arranca y funciona igual.
   OPENROUTER_API_KEY: z.string().trim().optional(),
+  AI_PROVIDER: z.enum(['openrouter', 'anthropic']).default('openrouter'),
+  AI_MODEL_AGENT: z.string().trim().min(1).optional(),
+  AI_MODEL_FAST: z.string().trim().min(1).optional(),
+  OPENROUTER_MODEL_AGENT: z.string().trim().min(1).optional(),
+  OPENROUTER_MODEL_FAST: z.string().trim().min(1).optional(),
+  AI_AGENT_ENABLED: envBoolean(true),
+  AI_AGENT_FALLBACK_MODELS: z.string().default(''),
+  AI_INPUT_USD_PER_MILLION: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
+  AI_OUTPUT_USD_PER_MILLION: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
+  AI_DAILY_BUDGET_USD: z.coerce.number().nonnegative().default(0),
+  AI_ALLOWED_DOMAINS: z.string().default('conit.pe,conit.novatec.ink'),
+  ANTHROPIC_API_KEY: z.string().trim().optional(),
+  ANTHROPIC_BASE_URL: z.string().url().default('https://api.anthropic.com/v1'),
+  ANTHROPIC_API_VERSION: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .default('2026-10-21'),
+  ANTHROPIC_MODEL: z.string().trim().default('claude-sonnet-5-5'),
+  AI_EMBEDDING_MODEL: z.string().trim().optional(),
+  AI_VECTOR_ENABLED: envBoolean(false),
+  AI_DNSBL_ZONES: z.string().default(''),
+  AI_MEDIA_ENABLED: envBoolean(false),
+  AI_TRANSCRIPTION_URL: z.string().url().optional(),
+  AI_TRANSCRIPTION_KEY: z.string().trim().optional(),
+  AI_TRANSCRIPTION_MODEL: z.string().trim().default('whisper-1'),
+  AI_MONITOR_ENABLED: envBoolean(false),
+  AI_MEDIA_RETENTION_DAYS: envNumber(90),
   /**
    * Modelo principal.
    *
@@ -114,7 +147,9 @@ export const envSchema = z.object({
   OPENROUTER_FALLBACK_MODELS: z
     .string()
     .trim()
-    .default('nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free,openrouter/free'),
+    .default(
+      'nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free,openrouter/free',
+    ),
   OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
 
   // --- Correo saliente ------------------------------------------------------

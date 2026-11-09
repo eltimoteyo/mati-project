@@ -11,6 +11,8 @@ import type { TicketPriority } from './ticket';
  * configurado, no se muestran botones que fueran a fallar al pulsarlos.
  */
 export interface AiStatus {
+  provider?: string;
+  agentModel?: string | null;
   enabled: boolean;
   /** Modelo activo. `null` cuando el asistente no esta configurado. */
   model: string | null;

@@ -3,20 +3,20 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TicketsModule } from '../tickets/tickets.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
+import { AiGateway } from './ai-gateway.service';
+import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 
 /**
  * Asistente de soporte.
  *
- * Solo se registra OpenRouter: su API es compatible con la de OpenAI y da
- * acceso a modelos de varios fabricantes cambiando una variable de entorno,
- * asi que anadir un segundo proveedor ahora seria codigo sin uso. La interfaz
- * `AiProvider` deja la puerta abierta a hacerlo cuando haga falta de verdad.
+ * El gateway selecciona Anthropic directo u OpenRouter. El flujo de soporte
+ * comparte mensajes y herramientas sin depender del protocolo del proveedor.
  */
 @Module({
   imports: [forwardRef(() => TicketsModule)],
   controllers: [AiController],
-  providers: [OpenRouterProvider, AiService],
-  exports: [AiService],
+  providers: [OpenRouterProvider, AnthropicProvider, AiGateway, AiService],
+  exports: [AiService, AiGateway],
 })
 export class AiModule {}

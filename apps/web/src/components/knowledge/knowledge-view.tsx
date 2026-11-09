@@ -16,6 +16,7 @@ import {
   SelectValue,
   Skeleton,
 } from '@conit/ui';
+import { useMutation } from '@tanstack/react-query';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BookOpenIcon, EyeIcon, FileTextIcon, PlusIcon } from 'lucide-react';
@@ -27,6 +28,8 @@ import { PageHeader } from '@/components/common/page-header';
 import { useArticles, useArticlesSummary } from '@/hooks/use-articles';
 import { useCategoryOptions } from '@/hooks/use-categories';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
+import { notify } from '@/lib/notify';
+import { supportService } from '@/services/support.service';
 
 import { ArticleFormDialog } from './article-form-dialog';
 
@@ -53,6 +56,11 @@ function ArticleCard({ article }: { article: ArticleListItem }) {
   return (
     <Card className="group transition-colors hover:border-primary/30">
       <CardContent className="flex h-full flex-col gap-3 py-5">
+        {!article.isPublished ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/base-conocimiento/${article.slug}`}>Revisar borrador</Link>
+          </Button>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <Link
             href={`/admin/base-conocimiento/${article.slug}`}
@@ -129,6 +137,11 @@ function SummaryStrip() {
  * articulo es su resumen, y un resumen no cabe en una celda.
  */
 export function KnowledgeView() {
+  const index = useMutation({
+    mutationFn: supportService.indexKnowledge,
+    onSuccess: (result) => notify.success(`${result.indexed} fragmentos actualizados`),
+    onError: (error) => notify.fromError(error, 'No se pudo actualizar el índice'),
+  });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -161,6 +174,20 @@ export function KnowledgeView() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setVisibility('false');
+            setPage(1);
+          }}
+        >
+          Pendientes de revisión
+        </Button>
+        <Button variant="outline" loading={index.isPending} onClick={() => index.mutate()}>
+          Actualizar búsqueda de guías
+        </Button>
+      </div>
       <PageHeader
         title="Base de conocimiento"
         description="Guias, soluciones y procedimientos para resolver incidencias frecuentes."

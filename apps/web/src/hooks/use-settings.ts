@@ -1,6 +1,6 @@
 'use client';
 
-import type { UpdateAutomationSettingsInput } from '@conit/types';
+import type { UpdateAiLimitsSettingsInput, UpdateAutomationSettingsInput } from '@conit/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { notify } from '@/lib/notify';
@@ -29,5 +29,25 @@ export function useUpdateAutomationSettings() {
       );
     },
     onError: (error) => notify.fromError(error, 'No se pudo guardar el ajuste.'),
+  });
+}
+
+export function useAiLimits() {
+  return useQuery({
+    queryKey: queryKeys.settings.aiLimits(),
+    queryFn: () => settingsService.aiLimits(),
+  });
+}
+
+/** Los errores se dejan al formulario, que sabe marcarlos en cada campo. */
+export function useUpdateAiLimits() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateAiLimitsSettingsInput) => settingsService.updateAiLimits(input),
+    onSuccess: (limits) => {
+      queryClient.setQueryData(queryKeys.settings.aiLimits(), limits);
+      notify.success('Limites de la IA guardados');
+    },
   });
 }

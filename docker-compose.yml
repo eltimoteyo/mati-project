@@ -77,6 +77,16 @@ services:
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      AI_AGENT_ENABLED: ${AI_AGENT_ENABLED:-true}
+      AI_MEDIA_ENABLED: ${AI_MEDIA_ENABLED:-false}
+      AI_TRANSCRIPTION_KEY: ${AI_TRANSCRIPTION_KEY:-}
+      AI_TRANSCRIPTION_MODEL: ${AI_TRANSCRIPTION_MODEL:-whisper-1}
+      AI_MONITOR_ENABLED: ${AI_MONITOR_ENABLED:-false}
+      AI_DAILY_BUDGET_USD: ${AI_DAILY_BUDGET_USD:-0}
       # Dentro del contenedor siempre la misma ruta; fuera es un volumen.
       UPLOADS_DIR: /app/uploads
       # Solo se usan al ejecutar `pnpm db:seed` dentro del contenedor.

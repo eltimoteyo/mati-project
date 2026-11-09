@@ -64,6 +64,7 @@ export const queryKeys = {
   settings: {
     all: ['settings'] as const,
     automation: () => [...queryKeys.settings.all, 'automation'] as const,
+    aiLimits: () => [...queryKeys.settings.all, 'ai-limits'] as const,
   },
 
   ai: {

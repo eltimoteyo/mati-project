@@ -45,7 +45,7 @@ export class TicketWhatsappService {
   }
 
   /** Aviso de que el ticket ha pasado a su estado actual. */
-  async sendTicketStatus(ticketId: string): Promise<SendWhatsappResult> {
+  async sendTicketStatus(ticketId: string, assigned = false): Promise<SendWhatsappResult> {
     if (!this.whatsappCloud.isEnabled()) {
       return { sent: false, reason: 'El envio por WhatsApp no esta configurado' };
     }
@@ -56,6 +56,7 @@ export class TicketWhatsappService {
         number: true,
         subject: true,
         status: true,
+        whatsappConversation: { select: { phone: true, identityStatus: true } },
         client: { select: { phone: true } },
       },
     });
@@ -65,7 +66,7 @@ export class TicketWhatsappService {
     }
 
     const code = formatTicketCode(ticket.number);
-    const to = toWhatsappNumber(ticket.client.phone);
+    const to = toWhatsappNumber(ticket.whatsappConversation?.phone ?? ticket.client.phone);
 
     // Un cliente sin telefono no es un error: hay fichas que solo tienen
     // correo. Se omite el envio y se dice por que.
@@ -76,7 +77,8 @@ export class TicketWhatsappService {
     }
 
     const subject = toTemplateParam(ticket.subject);
-    const status = TICKET_STATUS_LABELS[ticket.status as TicketStatus] ?? ticket.status;
+    const statusLabel = TICKET_STATUS_LABELS[ticket.status as TicketStatus] ?? ticket.status;
+    const status = assigned ? `Asignado al equipo (${statusLabel})` : statusLabel;
 
     // Mismo texto que la plantilla: es lo que se registra en la bandeja y lo
     // que sale si hay que recurrir al texto libre.
@@ -104,6 +106,27 @@ export class TicketWhatsappService {
 
     if (result.sent) {
       await this.recordInInbox(code, { phone: to, externalId: result.id ?? null, type, body });
+      if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+        const conversation = await this.prisma.whatsappConversation.findUnique({
+          where: { phone: to },
+          select: { lastInboundAt: true, identityStatus: true },
+        });
+        if (
+          conversation?.identityStatus === 'VERIFIED' &&
+          conversation.lastInboundAt &&
+          conversation.lastInboundAt.getTime() > Date.now() - 86_400_000
+        ) {
+          const question = `¿Se resolvió tu solicitud ${code}? Valora la atención del 1 al 5.`;
+          const survey = await this.whatsappCloud.sendText({ to, body: question });
+          if (survey.sent)
+            await this.recordInInbox(code, {
+              phone: to,
+              externalId: survey.id ?? null,
+              type: 'text',
+              body: question,
+            });
+        }
+      }
     }
 
     return result;

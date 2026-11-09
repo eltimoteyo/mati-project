@@ -1,11 +1,14 @@
 import type { WhatsappMessageStatus } from '@conit/types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { SettingsService } from '../settings/settings.service';
+
+/** Espera antes de responder cuando no hay ajustes (pruebas y scripts). */
+const DEFAULT_REPLY_DELAY_MS = 6000;
 
 /** Digitos minimos de un telefono de ficha para compararlo con un numero de WhatsApp. */
-const PHONE_MIN_DIGITS = 8;
 
 /**
  * Orden de los estados de entrega.
@@ -32,6 +35,8 @@ export interface InboundWhatsappMessage {
   type: string;
   body: string;
   sentAt: Date;
+  mediaId?: string;
+  mimeType?: string;
 }
 
 /** Mensaje que Meta ya acepto para enviar. */
@@ -69,7 +74,10 @@ export const WHATSAPP_MESSAGE_RELATIONS = {
  */
 @Injectable()
 export class WhatsappConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly settings?: SettingsService,
+  ) {}
 
   /**
    * Registra un mensaje del contacto y devuelve su conversacion.
@@ -86,6 +94,9 @@ export class WhatsappConversationsService {
     if (duplicate) return null;
 
     const conversation = await this.ensureConversation(message.phone);
+    const delayMs = this.settings
+      ? (await this.settings.getAiLimits()).replyDelaySeconds * 1000
+      : DEFAULT_REPLY_DELAY_MS;
 
     // Los webhooks pueden llegar desordenados: la ventana la abre el mensaje
     // mas reciente, no el ultimo en llegar.
@@ -107,6 +118,9 @@ export class WhatsappConversationsService {
             body: message.body,
             status: 'RECEIVED',
             createdAt: message.sentAt,
+            mediaId: message.mediaId,
+            mimeType: message.mimeType,
+            mediaProcessed: !message.mediaId,
           },
         }),
         this.prisma.whatsappConversation.update({
@@ -117,6 +131,11 @@ export class WhatsappConversationsService {
             unreadCount: { increment: 1 },
             ...(message.profileName ? { profileName: message.profileName.slice(0, 120) } : {}),
           },
+        }),
+        this.prisma.autoReplyJob.upsert({
+          where: { conversationId: conversation.id },
+          create: { conversationId: conversation.id, runAt: new Date(Date.now() + delayMs) },
+          update: { runAt: new Date(Date.now() + delayMs), version: { increment: 1 }, attempts: 0 },
         }),
       ]);
     } catch (error) {
@@ -202,14 +221,30 @@ export class WhatsappConversationsService {
       const clientId = await this.findClientId(phone);
 
       return clientId
-        ? this.prisma.whatsappConversation.update({ where: { id: existing.id }, data: { clientId } })
+        ? this.prisma.whatsappConversation.update({
+            where: { id: existing.id },
+            data: {
+              clientId,
+              identityStatus: 'VERIFIED',
+              identifiedBy: 'PHONE',
+              identifiedAt: new Date(),
+            },
+          })
         : existing;
     }
 
     const clientId = await this.findClientId(phone);
 
     try {
-      return await this.prisma.whatsappConversation.create({ data: { phone, clientId } });
+      return await this.prisma.whatsappConversation.create({
+        data: {
+          phone,
+          clientId,
+          ...(clientId
+            ? { identityStatus: 'VERIFIED', identifiedBy: 'PHONE', identifiedAt: new Date() }
+            : {}),
+        },
+      });
     } catch (error) {
       // Otro mensaje del mismo numero la creo en paralelo.
       if (isUniqueViolation(error)) {
@@ -224,24 +259,30 @@ export class WhatsappConversationsService {
    * Cliente al que pertenece un numero.
    *
    * El telefono de la ficha es texto libre: puede estar como `+51 987 654 321`
-   * o sin codigo de pais (`987654321`). Se comparan solo los digitos, y una
-   * ficha sin prefijo encaja si es el final del numero de WhatsApp. Ante varias
-   * coincidencias gana la exacta y, despues, el cliente activo.
+   * o sin codigo de pais (`987 654 321`). Se compara normalizado igual que en
+   * `normalizePhone`: solo digitos y con el 51 delante de un movil peruano de
+   * 9 digitos. No hay coincidencias parciales: un numero que encaja con mas de
+   * un cliente no identifica a ninguno.
    */
   private async findClientId(phone: string): Promise<string | null> {
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT c.id
-      FROM (
-        SELECT id, name, status, REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') AS digits
-        FROM clients
-      ) AS c
-      WHERE LENGTH(c.digits) >= ${PHONE_MIN_DIGITS}
-        AND (c.digits = ${phone}::text OR ${phone}::text LIKE '%' || c.digits)
-      ORDER BY (c.digits = ${phone}::text) DESC, (c.status = 'ACTIVE') DESC, c.name ASC
-      LIMIT 1
+      SELECT DISTINCT c.id FROM clients c
+      CROSS JOIN LATERAL (
+        SELECT REGEXP_REPLACE(COALESCE(c.phone, ''), '[^0-9]', '', 'g') AS digits
+      ) AS ficha
+      LEFT JOIN client_contacts cc ON cc.client_id = c.id AND cc.verified_at IS NOT NULL AND cc.deleted_at IS NULL
+      WHERE c.status = 'ACTIVE' AND (
+        (CASE
+           WHEN ficha.digits ~ '^9[0-9]{8}$' THEN '51' || ficha.digits
+           WHEN ficha.digits LIKE '00%' THEN SUBSTRING(ficha.digits FROM 3)
+           ELSE ficha.digits
+         END = ${phone}
+          AND NOT EXISTS (SELECT 1 FROM client_contacts revoked WHERE revoked.client_id = c.id AND revoked.phone = ${phone} AND (revoked.deleted_at IS NOT NULL OR revoked.verified_at IS NULL)))
+        OR cc.phone = ${phone}
+      ) LIMIT 2
     `;
 
-    return rows[0]?.id ?? null;
+    return rows.length === 1 ? rows[0]!.id : null;
   }
 }
 

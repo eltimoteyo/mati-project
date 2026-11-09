@@ -3,6 +3,11 @@ title: El navegador dice que la conexión no es segura
 slug: aviso-conexion-no-segura
 category: hosting-y-dominios
 summary: Qué significa el aviso de conexión no segura y cuándo se debe a un problema del certificado SSL.
+
+servicio: HOSTING
+sintomas: aviso conexion no segura
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

@@ -3,6 +3,11 @@ title: Olvidé mi contraseña o no puedo iniciar sesión
 slug: olvide-mi-contrasena
 category: sistema-web
 summary: Cómo recuperar el acceso a la web, al sistema o al correo cuando la contraseña no funciona.
+
+servicio: WEB_SYSTEM
+sintomas: olvide mi contrasena
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

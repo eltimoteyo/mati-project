@@ -3,6 +3,11 @@ title: El correo corporativo no envía mensajes
 slug: correo-no-envia-mensajes
 category: correo-corporativo
 summary: Causas habituales cuando los correos se quedan en la bandeja de salida o vuelven con error, y qué revisar antes de avisar.
+
+servicio: EMAIL
+sintomas: correo no envia mensajes
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

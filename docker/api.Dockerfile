@@ -16,7 +16,7 @@ ENV PNPM_HOME="/pnpm" \
 # Prisma necesita OpenSSL para elegir el binario de motor correcto; la imagen
 # `slim` no lo incluye y sin el emite avisos y puede escoger uno equivocado.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /app

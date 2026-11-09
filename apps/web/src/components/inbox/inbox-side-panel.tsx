@@ -18,6 +18,7 @@ import { useCreateInboxTicket, useDraftInboxTicket } from '@/hooks/use-inbox';
 import { notify } from '@/lib/notify';
 
 import { conversationTitle, formatPhone } from './inbox-format';
+import { InboxCase, InboxIdentity } from './inbox-support';
 
 const TICKET_RULES = VALIDATION_RULES.ticket;
 
@@ -51,7 +52,9 @@ function prefillFromChat(conversation: InboxConversationDetail): Partial<CreateT
   const first = messages[0]?.body.replace(/\s+/g, ' ').trim() ?? '';
 
   const subject =
-    first.length > SUBJECT_PREVIEW_LENGTH ? `${first.slice(0, SUBJECT_PREVIEW_LENGTH - 1)}…` : first;
+    first.length > SUBJECT_PREVIEW_LENGTH
+      ? `${first.slice(0, SUBJECT_PREVIEW_LENGTH - 1)}…`
+      : first;
 
   const description =
     messages.length > 0
@@ -140,6 +143,8 @@ export function InboxSidePanel({ conversation }: { conversation: InboxConversati
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto p-5">
+      <InboxIdentity key={conversation.id} conversation={conversation} />
+      <InboxCase conversation={conversation} />
       {/* --- Contacto ----------------------------------------------------- */}
       <section className="flex flex-col gap-2" aria-labelledby="inbox-contact">
         <h3

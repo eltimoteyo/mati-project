@@ -16,8 +16,7 @@ import type {
 const SIGNATURE_PREFIX = 'sha256=';
 
 export type MetaSignatureResult =
-  | { valid: true }
-  | { valid: false; reason: 'missing-signature' | 'no-match' };
+  { valid: true } | { valid: false; reason: 'missing-signature' | 'no-match' };
 
 /**
  * Comprueba la cabecera `X-Hub-Signature-256`.
@@ -148,6 +147,12 @@ function parseMessage(
     type: type.slice(0, 30),
     body: describeContent(message, type),
     sentAt: Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000) : new Date(),
+    ...(asString(asRecord(message[type])?.['id'])
+      ? { mediaId: asString(asRecord(message[type])?.['id'])! }
+      : {}),
+    ...(asString(asRecord(message[type])?.['mime_type'])
+      ? { mimeType: asString(asRecord(message[type])?.['mime_type'])! }
+      : {}),
   };
 }
 

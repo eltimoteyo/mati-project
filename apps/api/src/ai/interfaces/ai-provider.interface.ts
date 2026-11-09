@@ -1,39 +1,38 @@
-/**
- * Contrato de los proveedores de IA — FASE POSTERIOR.
- *
- * Este archivo define unicamente la abstraccion sobre la que se implementaran
- * los proveedores (OpenRouter, Groq, Gemini) cuando llegue la fase de IA.
- * No hay implementaciones ni claves aqui a proposito: un proveedor simulado
- * seria codigo muerto y una clave en el repositorio, una fuga de seguridad.
- *
- * Estructura prevista (ver `src/ai/README.md`):
- *
- *   ai/
- *   ├── ai.module.ts
- *   ├── ai.service.ts
- *   ├── providers/
- *   │   ├── openrouter.provider.ts
- *   │   ├── groq.provider.ts
- *   │   └── gemini.provider.ts
- *   └── interfaces/
- *       └── ai-provider.interface.ts   <- este archivo
- */
+/** Contrato común de texto, imágenes y herramientas para los proveedores de IA. */
 
-/** Identificadores de los proveedores previstos. */
+/** Identificadores de proveedores. */
 export const AI_PROVIDERS = {
   OPENROUTER: 'openrouter',
   GROQ: 'groq',
   GEMINI: 'gemini',
+  ANTHROPIC: 'anthropic',
 } as const;
 
 export type AiProviderName = (typeof AI_PROVIDERS)[keyof typeof AI_PROVIDERS];
 
 /** Rol de cada mensaje dentro de una conversacion con el modelo. */
-export type AiMessageRole = 'system' | 'user' | 'assistant';
+export type AiMessageRole = 'system' | 'user' | 'assistant' | 'tool';
+
+export interface AiToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface AiTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
 
 export interface AiMessage {
   role: AiMessageRole;
   content: string;
+  toolCalls?: AiToolCall[];
+  toolCallId?: string;
+  image?: { mimeType: string; data: string };
+  providerContent?: unknown[];
+  reasoningDetails?: unknown[];
 }
 
 export interface AiCompletionOptions {
@@ -51,12 +50,19 @@ export interface AiCompletionOptions {
    * modulo tenga que conocer la lista de modelos ni reintentar por su cuenta.
    */
   validate?: (content: string) => boolean;
+  tools?: AiTool[];
+  /**
+   * Cuanto razona el modelo antes de responder. Solo lo aplica Anthropic; el
+   * resto de proveedores lo ignora.
+   */
+  effort?: 'low' | 'medium' | 'high';
 }
 
 export interface AiUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  cost?: number;
 }
 
 export interface AiCompletion {
@@ -64,6 +70,9 @@ export interface AiCompletion {
   model: string;
   provider: AiProviderName;
   usage?: AiUsage;
+  toolCalls?: AiToolCall[];
+  providerContent?: unknown[];
+  reasoningDetails?: unknown[];
 }
 
 /**

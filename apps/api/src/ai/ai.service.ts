@@ -20,9 +20,9 @@ import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/configuration';
 import { PrismaService } from '../database/prisma.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { AiGateway } from './ai-gateway.service';
 import type { SuggestReplyDto } from './dto/ai.dto';
 import type { AiMessage } from './interfaces/ai-provider.interface';
-import { OpenRouterProvider } from './providers/openrouter.provider';
 
 /** Mensajes de la conversacion que se envian como contexto. */
 const CONTEXT_MESSAGE_LIMIT = 20;
@@ -157,7 +157,7 @@ export class AiService {
   private readonly config: AppConfig['ai'];
 
   constructor(
-    private readonly provider: OpenRouterProvider,
+    private readonly provider: AiGateway,
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => TicketsService))
     private readonly ticketsService: TicketsService,
@@ -169,6 +169,8 @@ export class AiService {
   getStatus(): AiStatus {
     return {
       enabled: this.provider.isAvailable(),
+      provider: this.config.provider,
+      agentModel: this.provider.isAvailable() ? this.config.agentModel : null,
       model: this.provider.isAvailable() ? this.config.model : null,
     };
   }
@@ -192,7 +194,11 @@ export class AiService {
    * Devuelve tambien si la escribio la IA, para que el mensaje se marque como
    * tal y no se confunda con una respuesta de una persona de soporte.
    */
-  async portalReply(subject: string, description: string, conversation = ''): Promise<AutomaticText> {
+  async portalReply(
+    subject: string,
+    description: string,
+    conversation = '',
+  ): Promise<AutomaticText> {
     const fallback =
       'Hemos recibido tu consulta y la hemos enviado al equipo de sistemas. ' +
       'La revisaremos dentro de este ticket y te informaremos por aquí cuando esté resuelta.';
@@ -231,7 +237,11 @@ export class AiService {
   }
 
   /** Version que solo devuelve el texto, para quien no necesita saber el origen. */
-  async generatePortalReply(subject: string, description: string, conversation = ''): Promise<string> {
+  async generatePortalReply(
+    subject: string,
+    description: string,
+    conversation = '',
+  ): Promise<string> {
     return (await this.portalReply(subject, description, conversation)).text;
   }
 
@@ -293,7 +303,11 @@ export class AiService {
             content: `Incidencia: ${subject}\nDescripción: ${description}\nSolución: ${solution}`,
           },
         ],
-        { temperature: 0.2, maxTokens: 700, validate: (content) => this.parseJson(content) !== null },
+        {
+          temperature: 0.2,
+          maxTokens: 700,
+          validate: (content) => this.parseJson(content) !== null,
+        },
       );
 
       const parsed = this.parseJson<{ title?: unknown; summary?: unknown; content?: unknown }>(
@@ -331,7 +345,10 @@ export class AiService {
     options: { requireTroubleshoot?: boolean } = {},
   ): Promise<WhatsappReplyDecision> {
     const categories = await this.activeCategories();
-    const attemptsLeft = Math.max(context.maxTroubleshootAttempts - context.troubleshootAttempts, 0);
+    const attemptsLeft = Math.max(
+      context.maxTroubleshootAttempts - context.troubleshootAttempts,
+      0,
+    );
 
     const messages: AiMessage[] = [
       {
@@ -455,9 +472,7 @@ export class AiService {
 
     // Una respuesta sin texto no sirve para contestar: se trata como derivacion.
     const action: WhatsappAiAction =
-      (requested === 'reply' || requested === 'troubleshoot') && message
-        ? requested
-        : 'escalate';
+      (requested === 'reply' || requested === 'troubleshoot') && message ? requested : 'escalate';
 
     const subject = typeof parsed?.subject === 'string' ? parsed.subject.trim() : '';
     const description = typeof parsed?.description === 'string' ? parsed.description.trim() : '';
@@ -708,7 +723,9 @@ export class AiService {
           ? parsed.summary.trim()
           : completion.content,
       nextSteps: Array.isArray(parsed?.nextSteps)
-        ? parsed.nextSteps.filter((step): step is string => typeof step === 'string' && step.trim() !== '')
+        ? parsed.nextSteps.filter(
+            (step): step is string => typeof step === 'string' && step.trim() !== '',
+          )
         : [],
       model: completion.model,
     };

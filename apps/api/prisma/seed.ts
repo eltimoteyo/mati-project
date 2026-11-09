@@ -139,11 +139,12 @@ async function upsertUser(credentials: UserCredentials): Promise<string> {
     },
   });
 
-  const label = credentials.role === UserRole.ADMIN
-    ? 'Administrador'
-    : credentials.role === UserRole.SYSTEMS
-      ? 'Sistemas'
-      : 'Cliente';
+  const label =
+    credentials.role === UserRole.ADMIN
+      ? 'Administrador'
+      : credentials.role === UserRole.SYSTEMS
+        ? 'Sistemas'
+        : 'Cliente';
   console.log(`  OK  ${label}: ${user.name} <${user.email}>  [${user.role}]`);
 
   return user.id;
@@ -337,16 +338,106 @@ interface DemoTicket {
 }
 
 const DEMO_TICKETS: DemoTicket[] = [
-  { responseMinutes: 12, subject: 'Certificado SSL proximo a vencer', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.CRITICAL, daysAgo: 0, client: 0, project: 1, category: 'hosting-y-dominios' },
-  { responseMinutes: 35, subject: 'Correos corporativos no llegan a Gmail', status: TicketStatus.IN_PROGRESS, priority: TicketPriority.HIGH, daysAgo: 0, client: 2, project: 0, category: 'correo-corporativo' },
-  { responseMinutes: 95, subject: 'Error 500 al guardar matriculas', status: TicketStatus.IN_REVIEW, priority: TicketPriority.HIGH, daysAgo: 1, client: 1, project: 0, category: 'aula-virtual' },
-  { responseMinutes: 0, subject: 'Solicitud de respaldo de base de datos', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 1, client: 0, project: 0, category: 'base-de-datos' },
-  { responseMinutes: 210, subject: 'Renovacion de dominio institucional', status: TicketStatus.RESOLVED, priority: TicketPriority.MEDIUM, daysAgo: 3, client: 1, project: 1, category: 'hosting-y-dominios' },
-  { responseMinutes: 480, subject: 'Ajuste del formulario de contacto', status: TicketStatus.RESOLVED, priority: TicketPriority.LOW, daysAgo: 4, client: 2, project: 1, category: 'pagina-web' },
-  { responseMinutes: 55, subject: 'Lentitud en el catalogo de productos', status: TicketStatus.RESOLVED, priority: TicketPriority.HIGH, daysAgo: 6, client: 0, project: 0, category: 'sistema-web' },
-  { responseMinutes: 720, subject: 'Alta de nuevos buzones de correo', status: TicketStatus.CLOSED, priority: TicketPriority.LOW, daysAgo: 9, client: 2, project: 0, category: 'correo-corporativo' },
-  { responseMinutes: 18, subject: 'Restauracion de copia de seguridad', status: TicketStatus.RESOLVED, priority: TicketPriority.CRITICAL, daysAgo: 11, client: 0, project: 1, category: 'base-de-datos' },
-  { responseMinutes: 0, subject: 'Carga masiva de estudiantes', status: TicketStatus.NEW, priority: TicketPriority.MEDIUM, daysAgo: 2, client: 1, project: 0, category: 'aula-virtual' },
+  {
+    responseMinutes: 12,
+    subject: 'Certificado SSL proximo a vencer',
+    status: TicketStatus.IN_PROGRESS,
+    priority: TicketPriority.CRITICAL,
+    daysAgo: 0,
+    client: 0,
+    project: 1,
+    category: 'hosting-y-dominios',
+  },
+  {
+    responseMinutes: 35,
+    subject: 'Correos corporativos no llegan a Gmail',
+    status: TicketStatus.IN_PROGRESS,
+    priority: TicketPriority.HIGH,
+    daysAgo: 0,
+    client: 2,
+    project: 0,
+    category: 'correo-corporativo',
+  },
+  {
+    responseMinutes: 95,
+    subject: 'Error 500 al guardar matriculas',
+    status: TicketStatus.IN_REVIEW,
+    priority: TicketPriority.HIGH,
+    daysAgo: 1,
+    client: 1,
+    project: 0,
+    category: 'aula-virtual',
+  },
+  {
+    responseMinutes: 0,
+    subject: 'Solicitud de respaldo de base de datos',
+    status: TicketStatus.NEW,
+    priority: TicketPriority.MEDIUM,
+    daysAgo: 1,
+    client: 0,
+    project: 0,
+    category: 'base-de-datos',
+  },
+  {
+    responseMinutes: 210,
+    subject: 'Renovacion de dominio institucional',
+    status: TicketStatus.RESOLVED,
+    priority: TicketPriority.MEDIUM,
+    daysAgo: 3,
+    client: 1,
+    project: 1,
+    category: 'hosting-y-dominios',
+  },
+  {
+    responseMinutes: 480,
+    subject: 'Ajuste del formulario de contacto',
+    status: TicketStatus.RESOLVED,
+    priority: TicketPriority.LOW,
+    daysAgo: 4,
+    client: 2,
+    project: 1,
+    category: 'pagina-web',
+  },
+  {
+    responseMinutes: 55,
+    subject: 'Lentitud en el catalogo de productos',
+    status: TicketStatus.RESOLVED,
+    priority: TicketPriority.HIGH,
+    daysAgo: 6,
+    client: 0,
+    project: 0,
+    category: 'sistema-web',
+  },
+  {
+    responseMinutes: 720,
+    subject: 'Alta de nuevos buzones de correo',
+    status: TicketStatus.CLOSED,
+    priority: TicketPriority.LOW,
+    daysAgo: 9,
+    client: 2,
+    project: 0,
+    category: 'correo-corporativo',
+  },
+  {
+    responseMinutes: 18,
+    subject: 'Restauracion de copia de seguridad',
+    status: TicketStatus.RESOLVED,
+    priority: TicketPriority.CRITICAL,
+    daysAgo: 11,
+    client: 0,
+    project: 1,
+    category: 'base-de-datos',
+  },
+  {
+    responseMinutes: 0,
+    subject: 'Carga masiva de estudiantes',
+    status: TicketStatus.NEW,
+    priority: TicketPriority.MEDIUM,
+    daysAgo: 2,
+    client: 1,
+    project: 0,
+    category: 'aula-virtual',
+  },
 ];
 
 /** Fecha desplazada hacia atras; `days` negativo apunta al futuro. */
@@ -479,6 +570,8 @@ interface SupportGuide {
   summary: string;
   category: string;
   content: string;
+  published: boolean;
+  guidance: { service: string; sintomas: string[]; preguntas: string[]; derivarSi: string[] };
 }
 
 /** Lee una guia: cabecera `clave: valor` entre `---` y el contenido en Markdown. */
@@ -510,6 +603,13 @@ function parseGuide(raw: string, file: string): SupportGuide {
     slug: field('slug'),
     summary: field('summary'),
     category: field('category'),
+    published: meta.get('published') !== 'false',
+    guidance: {
+      service: meta.get('servicio') ?? 'OTHER',
+      sintomas: (meta.get('sintomas') ?? '').split('|').filter(Boolean),
+      preguntas: (meta.get('preguntas') ?? '').split('|').filter(Boolean),
+      derivarSi: (meta.get('derivar_si') ?? '').split('|').filter(Boolean),
+    },
     content: match[2].replace(/\r\n/g, '\n').trim(),
   };
 }
@@ -533,20 +633,28 @@ async function seedSupportGuides(authorId: string): Promise<void> {
   for (const guide of guides) {
     const already = await prisma.article.findUnique({
       where: { slug: guide.slug },
-      select: { id: true },
+      select: { id: true, guidance: true },
     });
 
-    if (already) continue;
+    if (already) {
+      if (already.guidance === null)
+        await prisma.article.update({
+          where: { id: already.id },
+          data: { guidance: guide.guidance },
+        });
+      continue;
+    }
 
     await prisma.article.create({
       data: {
         title: guide.title,
         slug: guide.slug,
         summary: guide.summary,
+        guidance: guide.guidance,
         content: guide.content,
         categoryId: categoryBySlug.get(guide.category) ?? null,
         authorId,
-        isPublished: true,
+        isPublished: guide.published,
       },
     });
 
@@ -581,9 +689,9 @@ async function seedDemoArticles(authorId: string): Promise<void> {
         summary: demo.summary,
         content: demo.content,
         categoryId: categoryBySlug.get(demo.category) ?? null,
-         authorId,
-         isPublished: demo.isPublished,
-       },
+        authorId,
+        isPublished: demo.isPublished,
+      },
     });
 
     created += 1;

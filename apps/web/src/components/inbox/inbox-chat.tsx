@@ -45,6 +45,7 @@ import { useSendInboxReply, useSetInboxAiPaused } from '@/hooks/use-inbox';
 import { useAutomationSettings } from '@/hooks/use-settings';
 
 import { conversationTitle, formatPhone } from './inbox-format';
+import { InboxFeedback, InboxMedia } from './inbox-support';
 
 interface InboxChatProps {
   conversation: InboxConversationDetail;
@@ -83,7 +84,13 @@ function MessageStatus({ status }: { status: WhatsappMessageStatus }) {
   );
 }
 
-function MessageBubble({ message }: { message: InboxMessage }) {
+function MessageBubble({
+  message,
+  conversationId,
+}: {
+  message: InboxMessage;
+  conversationId: string;
+}) {
   const inbound = message.direction === WHATSAPP_MESSAGE_DIRECTIONS.INBOUND;
   const failed = message.status === WHATSAPP_MESSAGE_STATUSES.FAILED;
 
@@ -112,9 +119,13 @@ function MessageBubble({ message }: { message: InboxMessage }) {
           </span>
         )}
 
+        <InboxMedia conversationId={conversationId} message={message} />
         <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
           {message.body}
         </p>
+        {message.aiGenerated ? (
+          <InboxFeedback conversationId={conversationId} message={message} />
+        ) : null}
 
         <div className="flex items-center justify-end gap-1 text-[0.6875rem] text-muted-foreground">
           <time dateTime={message.createdAt} className="tabular">
@@ -176,7 +187,11 @@ function Composer({
   });
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-1.5 border-t border-border p-3">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="flex flex-col gap-1.5 border-t border-border p-3"
+    >
       <div className="flex items-end gap-2">
         <Textarea
           {...register('body')}
@@ -223,7 +238,7 @@ function replyWindowLabel(conversation: InboxConversationDetail): string {
 
   const end = new Date(conversation.replyWindowEndsAt);
 
-  return `Puedes responder hasta ${format(end, isToday(end) ? "'las' HH:mm" : "d MMM, HH:mm", { locale: es })}`;
+  return `Puedes responder hasta ${format(end, isToday(end) ? "'las' HH:mm" : 'd MMM, HH:mm', { locale: es })}`;
 }
 
 /**
@@ -245,7 +260,7 @@ function AiControl({
 
   const paused = conversation.aiPaused;
   const until = conversation.aiPausedUntil
-    ? format(new Date(conversation.aiPausedUntil), "d MMM, HH:mm", { locale: es })
+    ? format(new Date(conversation.aiPausedUntil), 'd MMM, HH:mm', { locale: es })
     : null;
 
   return (
@@ -255,7 +270,9 @@ function AiControl({
       loading={setPaused.isPending}
       onClick={() => setPaused.mutate(!paused)}
       title={paused && until ? `IA en pausa hasta el ${until}` : 'La IA responde automaticamente'}
-      aria-label={paused ? 'Reanudar la IA en esta conversacion' : 'Pausar la IA en esta conversacion'}
+      aria-label={
+        paused ? 'Reanudar la IA en esta conversacion' : 'Pausar la IA en esta conversacion'
+      }
     >
       {paused ? <PlayIcon /> : <PauseIcon />}
       <span className="hidden sm:inline">{paused ? 'Reanudar IA' : 'Pausar IA'}</span>
@@ -346,7 +363,7 @@ export function InboxChat({ conversation, onBack, actions }: InboxChatProps) {
         ) : (
           <ul className="flex flex-col gap-2.5">
             {conversation.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble key={message.id} message={message} conversationId={conversation.id} />
             ))}
           </ul>
         )}

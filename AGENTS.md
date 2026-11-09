@@ -20,6 +20,13 @@ pnpm --filter @conit/web typecheck      # Solo el frontend
 pnpm --filter @conit/types typecheck    # Solo tipos compartidos
 ```
 
+## Pruebas
+
+```bash
+pnpm test
+pnpm --filter @conit/api test
+```
+
 ## Base de datos
 
 ```bash

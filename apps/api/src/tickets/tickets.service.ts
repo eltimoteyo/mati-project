@@ -136,11 +136,22 @@ export class TicketsService {
     dto: CreateTicketDto,
     /** Quien lo registra; `null` cuando lo crea el asistente de IA. */
     actorId: string | null,
-    origin: { whatsappConversationId?: string; note?: string } = {},
+    origin: { whatsappConversationId?: string; note?: string; supportCaseId?: string } = {},
   ): Promise<TicketDetail> {
     await this.assertRelations(dto.clientId, dto.projectId, dto.categoryId, dto.assigneeId);
 
+    let reused = false;
     const created = await this.prisma.$transaction(async (tx) => {
+      if (origin.supportCaseId) {
+        const cases = await tx.$queryRaw<
+          Array<{ ticket_id: string | null }>
+        >`SELECT ticket_id FROM support_cases WHERE id = ${origin.supportCaseId}::uuid FOR UPDATE`;
+        if (!cases.length) throw new NotFoundException('El caso no existe');
+        if (cases[0]?.ticket_id) {
+          reused = true;
+          return tx.ticket.findUniqueOrThrow({ where: { id: cases[0].ticket_id } });
+        }
+      }
       const ticket = await tx.ticket.create({
         data: {
           subject: dto.subject,
@@ -170,6 +181,11 @@ export class TicketsService {
 
       await this.writeEvents(tx, ticket.id, actorId, events);
       await this.notifyOnCreate(tx, ticket, actorId);
+      if (origin.supportCaseId)
+        await tx.supportCase.update({
+          where: { id: origin.supportCaseId },
+          data: { ticketId: ticket.id, stage: 'FOLLOW_UP' },
+        });
 
       return ticket;
     });
@@ -181,7 +197,7 @@ export class TicketsService {
     // El correo se envia despues de confirmar la transaccion: avisar de un
     // ticket que luego se revierte seria peor que no avisar. `MailService`
     // nunca lanza, asi que esperar aqui no puede tumbar el alta.
-    await this.ticketMail.sendTicketCreated(created.id);
+    if (!reused) await this.ticketMail.sendTicketCreated(created.id);
 
     return this.findOne(created.id);
   }
@@ -277,6 +293,11 @@ export class TicketsService {
       await tx.ticket.update({ where: { id: current.id }, data });
       await this.writeEvents(tx, current.id, actorId, events);
       await this.notifyOnUpdate(tx, current, dto, actorId);
+      if (dto.status === 'RESOLVED' || dto.status === 'CLOSED')
+        await tx.supportCase.updateMany({
+          where: { ticketId: current.id, closedAt: null },
+          data: { stage: 'RESOLVED', closedAt: new Date() },
+        });
     });
 
     // El aviso por WhatsApp sale al llegar a un estado final. Cerrar un ticket
@@ -285,10 +306,13 @@ export class TicketsService {
     if (
       dto.status &&
       dto.status !== current.status &&
-      (dto.status === 'RESOLVED' || (dto.status === 'CLOSED' && current.status !== 'RESOLVED'))
+      (dto.status === 'IN_PROGRESS' ||
+        dto.status === 'RESOLVED' ||
+        (dto.status === 'CLOSED' && current.status !== 'RESOLVED'))
     ) {
       await this.ticketWhatsapp.sendTicketStatus(current.id);
-    }
+    } else if (dto.assigneeId && dto.assigneeId !== current.assigneeId)
+      await this.ticketWhatsapp.sendTicketStatus(current.id, true);
 
     // Por correo solo se comunica la resolucion. Los estados intermedios son
     // informacion de proceso: enviarlos convertiria su buzon en un registro de
@@ -508,7 +532,10 @@ export class TicketsService {
   private async articleSlug(title: string, code: string): Promise<string> {
     const base = `${slugify(title) || 'solucion'}-${code.toLowerCase()}`;
 
-    const taken = await this.prisma.article.findUnique({ where: { slug: base }, select: { id: true } });
+    const taken = await this.prisma.article.findUnique({
+      where: { slug: base },
+      select: { id: true },
+    });
 
     return taken ? `${base}-${Date.now().toString(36)}` : base;
   }

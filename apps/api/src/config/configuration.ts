@@ -65,18 +65,54 @@ export function configuration() {
     },
 
     ai: {
-      apiKey: env.OPENROUTER_API_KEY,
-      model: env.OPENROUTER_MODEL,
+      provider: env.AI_PROVIDER,
+      anthropicVersion: env.ANTHROPIC_API_VERSION,
+      apiKey: env.AI_PROVIDER === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENROUTER_API_KEY,
+      model:
+        env.AI_MODEL_FAST ??
+        (env.AI_PROVIDER === 'anthropic'
+          ? env.ANTHROPIC_MODEL
+          : (env.OPENROUTER_MODEL_FAST ?? env.OPENROUTER_MODEL)),
+      agentModel:
+        env.AI_MODEL_AGENT ??
+        (env.AI_PROVIDER === 'anthropic'
+          ? env.ANTHROPIC_MODEL
+          : (env.OPENROUTER_MODEL_AGENT ?? env.OPENROUTER_MODEL)),
+      agentEnabled: env.AI_AGENT_ENABLED,
+      agentFallbackModels: env.AI_AGENT_FALLBACK_MODELS.split(',')
+        .map((model) => model.trim())
+        .filter(Boolean),
+      inputPrice: env.AI_INPUT_USD_PER_MILLION,
+      outputPrice: env.AI_OUTPUT_USD_PER_MILLION,
+      dailyBudget: env.AI_DAILY_BUDGET_USD,
+      allowedDomains: env.AI_ALLOWED_DOMAINS.split(',')
+        .map((domain) => domain.trim().toLowerCase())
+        .filter(Boolean),
+      openrouterKey: env.OPENROUTER_API_KEY,
+      embeddingModel: env.AI_EMBEDDING_MODEL,
+      vectorEnabled: env.AI_VECTOR_ENABLED,
+      dnsblZones: env.AI_DNSBL_ZONES.split(',')
+        .map((zone) => zone.trim())
+        .filter(Boolean),
+      mediaEnabled: env.AI_MEDIA_ENABLED,
+      transcriptionUrl: env.AI_TRANSCRIPTION_URL,
+      transcriptionKey: env.AI_TRANSCRIPTION_KEY,
+      transcriptionModel: env.AI_TRANSCRIPTION_MODEL,
+      monitorEnabled: env.AI_MONITOR_ENABLED,
+      mediaRetentionDays: env.AI_MEDIA_RETENTION_DAYS,
       fallbackModels: env.OPENROUTER_FALLBACK_MODELS.split(',')
         .map((model) => model.trim())
         .filter(Boolean),
-      baseUrl: env.OPENROUTER_BASE_URL,
+      baseUrl: env.AI_PROVIDER === 'anthropic' ? env.ANTHROPIC_BASE_URL : env.OPENROUTER_BASE_URL,
+      openrouterBaseUrl: env.OPENROUTER_BASE_URL,
       // La disponibilidad se decide aqui una sola vez: los servicios preguntan
       // por este booleano en lugar de comprobar si hay clave cada vez.
-      enabled: Boolean(env.OPENROUTER_API_KEY),
+      enabled: Boolean(
+        env.AI_PROVIDER === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENROUTER_API_KEY,
+      ),
     },
 
-     mail: {
+    mail: {
       apiKey: env.RESEND_API_KEY,
       from: env.MAIL_FROM,
       replyTo: env.MAIL_REPLY_TO,
@@ -100,7 +136,8 @@ export function configuration() {
       authToken: env.TWILIO_AUTH_TOKEN,
       /** Numero de WhatsApp de CONIT, con prefijo `whatsapp:`. */
       fromNumber: env.TWILIO_WHATSAPP_NUMBER,
-      enabled: env.WHATSAPP_ENABLED && Boolean(env.TWILIO_ACCOUNT_SID) && Boolean(env.TWILIO_AUTH_TOKEN),
+      enabled:
+        env.WHATSAPP_ENABLED && Boolean(env.TWILIO_ACCOUNT_SID) && Boolean(env.TWILIO_AUTH_TOKEN),
       /**
        * Avisos salientes por la Cloud API de Meta. Es independiente de la
        * recepcion por Twilio: cada una se activa con sus propias credenciales.

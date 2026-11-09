@@ -1,4 +1,9 @@
-import type { AutomationSettings, UpdateAutomationSettingsInput } from '@conit/types';
+import type {
+  AiLimitsSettings,
+  AutomationSettings,
+  UpdateAiLimitsSettingsInput,
+  UpdateAutomationSettingsInput,
+} from '@conit/types';
 
 import { apiClient } from '@/lib/api-client';
 
@@ -10,5 +15,13 @@ export const settingsService = {
 
   updateAutomation(input: UpdateAutomationSettingsInput): Promise<AutomationSettings> {
     return apiClient.patch<AutomationSettings>('/settings/automation', input);
+  },
+
+  aiLimits(): Promise<AiLimitsSettings> {
+    return apiClient.get<AiLimitsSettings>('/settings/ai-limits');
+  },
+
+  updateAiLimits(input: UpdateAiLimitsSettingsInput): Promise<AiLimitsSettings> {
+    return apiClient.patch<AiLimitsSettings>('/settings/ai-limits', input);
   },
 };

@@ -60,6 +60,11 @@ export interface InboxMessage {
   /** Escrito por la respuesta automatica de IA. */
   aiGenerated: boolean;
   createdAt: string;
+  mediaAvailable?: boolean;
+  mimeType?: string | null;
+  transcript?: string | null;
+  feedback?: number | null;
+  feedbackReason?: string | null;
 }
 
 export interface InboxConversation {
@@ -83,6 +88,7 @@ export interface InboxConversation {
    */
   aiPaused: boolean;
   aiPausedUntil: string | null;
+  identityStatus?: 'UNKNOWN' | 'CLAIMED' | 'VERIFIED';
 }
 
 /** Ticket creado desde una conversacion. */
@@ -99,6 +105,14 @@ export interface InboxConversationDetail extends InboxConversation {
   messages: InboxMessage[];
   /** Tickets creados desde esta conversacion, del mas reciente al mas antiguo. */
   tickets: InboxTicketRef[];
+  supportCase?: {
+    id: string;
+    stage: string;
+    summary: string;
+    facts: Record<string, unknown>;
+    stepsTried: Array<{ step: string; result: string }>;
+    attempts: number;
+  } | null;
 }
 
 export interface InboxQuery extends PaginationQuery {

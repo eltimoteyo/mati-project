@@ -24,6 +24,9 @@ import { PageHeader } from '@/components/common/page-header';
 import { useAiStatus } from '@/hooks/use-ai';
 import { useAutomationSettings, useUpdateAutomationSettings } from '@/hooks/use-settings';
 
+import { AiLimitsCard } from './ai-limits-card';
+import { AiMetrics } from './ai-metrics';
+
 const CAPABILITIES = [
   {
     icon: WandSparklesIcon,
@@ -91,9 +94,9 @@ function AutoReplyCard({ aiEnabled }: { aiEnabled: boolean }) {
         </p>
         <p className="max-w-3xl">
           Si tras dos intentos el problema sigue, o hace falta el equipo tecnico, crea el ticket con
-          el diagnostico, le explica al cliente lo que cree que pasa y le da el codigo. Despues sigue
-          informando del estado del ticket para que el cliente no quede sin respuesta, hasta que
-          alguien del equipo responda en el chat: entonces se aparta {WHATSAPP_AI_HANDOFF_HOURS}{' '}
+          el diagnostico, le explica al cliente lo que cree que pasa y le da el codigo. Despues
+          sigue informando del estado del ticket para que el cliente no quede sin respuesta, hasta
+          que alguien del equipo responda en el chat: entonces se aparta {WHATSAPP_AI_HANDOFF_HOURS}{' '}
           horas.
         </p>
         {settings.isError ? (
@@ -157,20 +160,26 @@ export function AiView() {
             </p>
           ) : status.data?.enabled ? (
             <p className="text-sm text-muted-foreground">
-              Modelo activo:{' '}
+              Proveedor: {status.data.provider ?? 'openrouter'} · Modelo rápido:{' '}
               <span className="font-mono text-xs text-foreground">{status.data.model}</span>
+              <br />
+              Agente:{' '}
+              <span className="font-mono text-xs text-foreground">
+                {status.data.agentModel ?? status.data.model}
+              </span>
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No hay proveedor configurado. Define <code className="font-mono">OPENROUTER_API_KEY</code>{' '}
-              en el entorno de la API para activarlo. Mientras tanto, las acciones de asistente no
-              aparecen en los tickets.
+              No hay proveedor configurado. Configura las credenciales de Anthropic u OpenRouter en
+              el servidor para activar el asistente.
             </p>
           )}
         </CardContent>
       </Card>
 
       <AutoReplyCard aiEnabled={status.data?.enabled === true} />
+      <AiLimitsCard />
+      <AiMetrics />
 
       <div className="grid gap-4 md:grid-cols-3">
         {CAPABILITIES.map(({ icon: Icon, title, description }) => (

@@ -18,12 +18,54 @@ if (!connectionString) throw new Error('DATABASE_URL no esta definida.');
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 const categories = [
-  ['Hosting y dominios', 'hosting-y-dominios', 'Caidas del servidor, certificados SSL, renovaciones y DNS.', 'BRAND', 30, 240],
-  ['Correo corporativo', 'correo-corporativo', 'Buzones, entrega de mensajes y clientes de correo.', 'INFO', 60, 480],
-  ['Sistema web', 'sistema-web', 'Errores funcionales, rendimiento y ajustes de sistemas a medida.', 'SUCCESS', 120, 1440],
-  ['Aula virtual', 'aula-virtual', 'Matriculas, cursos, accesos y contenidos de la plataforma educativa.', 'WARNING', 120, 1440],
-  ['Base de datos', 'base-de-datos', 'Respaldos, restauraciones, migraciones y consultas lentas.', 'DANGER', 30, 480],
-  ['Pagina web', 'pagina-web', 'Contenidos, formularios, diseno y posicionamiento.', 'NEUTRAL', 240, 2880],
+  [
+    'Hosting y dominios',
+    'hosting-y-dominios',
+    'Caidas del servidor, certificados SSL, renovaciones y DNS.',
+    'BRAND',
+    30,
+    240,
+  ],
+  [
+    'Correo corporativo',
+    'correo-corporativo',
+    'Buzones, entrega de mensajes y clientes de correo.',
+    'INFO',
+    60,
+    480,
+  ],
+  [
+    'Sistema web',
+    'sistema-web',
+    'Errores funcionales, rendimiento y ajustes de sistemas a medida.',
+    'SUCCESS',
+    120,
+    1440,
+  ],
+  [
+    'Aula virtual',
+    'aula-virtual',
+    'Matriculas, cursos, accesos y contenidos de la plataforma educativa.',
+    'WARNING',
+    120,
+    1440,
+  ],
+  [
+    'Base de datos',
+    'base-de-datos',
+    'Respaldos, restauraciones, migraciones y consultas lentas.',
+    'DANGER',
+    30,
+    480,
+  ],
+  [
+    'Pagina web',
+    'pagina-web',
+    'Contenidos, formularios, diseno y posicionamiento.',
+    'NEUTRAL',
+    240,
+    2880,
+  ],
 ];
 
 async function upsertAccount(prefix, role) {
@@ -94,18 +136,37 @@ async function seedSupportGuides(authorId) {
   let created = 0;
 
   for (const guide of readSupportGuides()) {
-    const already = await prisma.article.findUnique({ where: { slug: guide.slug }, select: { id: true } });
-    if (already) continue;
+    const guidance = {
+      service: guide.servicio || 'OTHER',
+      sintomas: (guide.sintomas || '').split('|').filter(Boolean),
+      preguntas: (guide.preguntas || '').split('|').filter(Boolean),
+      derivarSi: (guide.derivar_si || '').split('|').filter(Boolean),
+    };
+    const already = await prisma.article.findUnique({
+      where: { slug: guide.slug },
+      select: { id: true, guidance: true },
+    });
+    if (already) {
+      if (already.guidance === null)
+        await prisma.article.update({ where: { id: already.id }, data: { guidance } });
+      continue;
+    }
 
     await prisma.article.create({
       data: {
         title: guide.title,
         slug: guide.slug,
         summary: guide.summary,
+        guidance: {
+          service: guide.servicio || 'OTHER',
+          sintomas: (guide.sintomas || '').split('|').filter(Boolean),
+          preguntas: (guide.preguntas || '').split('|').filter(Boolean),
+          derivarSi: (guide.derivar_si || '').split('|').filter(Boolean),
+        },
         content: guide.content,
         categoryId: categoryBySlug.get(guide.category) ?? null,
         authorId,
-        isPublished: true,
+        isPublished: guide.published !== 'false',
       },
     });
     created += 1;
@@ -128,12 +189,24 @@ async function main() {
       await prisma.client.update({ where: { id: existingClient.id }, data: { userId: client.id } });
     } else {
       await prisma.client.create({
-        data: { name: client.name, contactName: client.name, email: client.email, userId: client.id },
+        data: {
+          name: client.name,
+          contactName: client.name,
+          email: client.email,
+          userId: client.id,
+        },
       });
     }
   }
 
-  for (const [name, slug, description, color, responseTimeMinutes, resolutionTimeMinutes] of categories) {
+  for (const [
+    name,
+    slug,
+    description,
+    color,
+    responseTimeMinutes,
+    resolutionTimeMinutes,
+  ] of categories) {
     await prisma.category.upsert({
       where: { slug },
       update: {},
@@ -143,7 +216,9 @@ async function main() {
 
   const guides = await seedSupportGuides(admin.id);
 
-  console.log(`Inicializacion completada: ${admin.email} y ${client.email}; ${guides} guias nuevas.`);
+  console.log(
+    `Inicializacion completada: ${admin.email} y ${client.email}; ${guides} guias nuevas.`,
+  );
 }
 
 main().finally(() => prisma.$disconnect());

@@ -1,0 +1,232 @@
+[
+  {
+    "id": "identificacion-01",
+    "inbound": "Hola",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-02",
+    "inbound": "Buenos días",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-03",
+    "inbound": "¿Qué servicios ofrecen?",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-04",
+    "inbound": "Necesito ayuda",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-05",
+    "inbound": "¿Pueden desarrollar una web?",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-06",
+    "inbound": "Somos una empresa nueva",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-07",
+    "inbound": "¿Cuál es su horario?",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-08",
+    "inbound": "Quiero contratar hosting",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-09",
+    "inbound": "Hola, escribo desde otro número",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "identificacion-10",
+    "inbound": "Mi web no carga y soy de una empresa cliente",
+    "identity": "UNKNOWN",
+    "attempts": 0,
+    "expectedAction": "reply"
+  },
+  {
+    "id": "derivacion-01",
+    "inbound": "Quiero hablar con una persona",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-02",
+    "inbound": "Necesito un técnico humano",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-03",
+    "inbound": "Mi web fue hackeada",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-04",
+    "inbound": "Se borraron todos los datos",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-05",
+    "inbound": "El problema sigue después de los dos intentos",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-06",
+    "inbound": "Ya hice todo y sigue igual",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-07",
+    "inbound": "No funciona con ningún navegador",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-08",
+    "inbound": "El correo continúa fallando",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-09",
+    "inbound": "Volvió el mismo error",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "derivacion-10",
+    "inbound": "Necesito que el equipo lo revise",
+    "identity": "VERIFIED",
+    "attempts": 2,
+    "expectedAction": "escalate",
+    "summary": "Se han probado dos rondas de diagnóstico sin resolver."
+  },
+  {
+    "id": "resolucion-01",
+    "inbound": "Ya funciona correctamente",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-02",
+    "inbound": "Se solucionó el problema",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-03",
+    "inbound": "El problema ya está resuelto",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-04",
+    "inbound": "Funcionó el paso que me diste",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-05",
+    "inbound": "Ya está bien, puedo entrar",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-06",
+    "inbound": "Ya funciona el correo",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-07",
+    "inbound": "La web ya carga correctamente",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-08",
+    "inbound": "Se solucionó al abrir otro navegador",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-09",
+    "inbound": "Confirmo que ya funciona",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  },
+  {
+    "id": "resolucion-10",
+    "inbound": "Ya está resuelto, gracias",
+    "identity": "VERIFIED",
+    "attempts": 1,
+    "expectedAction": "resolved",
+    "summary": "Había un fallo de acceso; se propuso abrir otro navegador."
+  }
+]

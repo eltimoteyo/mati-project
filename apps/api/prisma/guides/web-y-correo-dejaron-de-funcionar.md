@@ -3,6 +3,11 @@ title: La web y el correo dejaron de funcionar a la vez
 slug: web-y-correo-dejaron-de-funcionar
 category: hosting-y-dominios
 summary: Cuando todo falla de golpe suele ser el dominio o el hosting. Qué revisar y por qué conviene avisar enseguida.
+
+servicio: HOSTING
+sintomas: web y correo dejaron de funcionar
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

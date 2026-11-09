@@ -3,6 +3,11 @@ title: La web o el sistema va lento
 slug: web-o-sistema-lento
 category: sistema-web
 summary: Causas frecuentes de lentitud en webs, sistemas y aulas virtuales, y qué comprobar.
+
+servicio: WEB_SYSTEM
+sintomas: web o sistema lento
+preguntas: ¿Desde cuándo ocurre? | ¿A qué usuarios afecta? | ¿Cuál es el texto del error?
+derivar_si: Riesgo de datos o seguridad | Requiere acceso administrativo | Dos intentos sin resultado
 ---
 ## Qué puede estar pasando
 

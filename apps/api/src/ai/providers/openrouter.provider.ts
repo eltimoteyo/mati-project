@@ -16,12 +16,19 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 /** Forma de la respuesta de OpenRouter que realmente se consume. */
 interface OpenRouterResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    message?: {
+      content?: string;
+      tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+      reasoning_details?: unknown[];
+    };
+  }>;
   model?: string;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    cost?: number;
   };
   error?: { message?: string };
 }
@@ -69,7 +76,11 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     // Si quien llama pide un modelo concreto se respeta y no se sustituye.
-    const chain = options.model ? [options.model] : [this.config.model, ...this.config.fallbackModels];
+    const chain = options.tools?.length
+      ? [options.model ?? this.config.agentModel, ...this.config.agentFallbackModels]
+      : options.model
+        ? [options.model]
+        : [this.config.model, ...this.config.fallbackModels];
 
     let lastReason = 'sin detalle';
 
@@ -82,7 +93,9 @@ export class OpenRouterProvider implements AiProvider {
 
       if (!result.retryable) break;
 
-      this.logger.warn(`${candidate} no disponible (${result.reason}); probando el siguiente modelo`);
+      this.logger.warn(
+        `${candidate} no disponible (${result.reason}); probando el siguiente modelo`,
+      );
     }
 
     throw new ServiceUnavailableException(
@@ -96,10 +109,8 @@ export class OpenRouterProvider implements AiProvider {
     messages: AiMessage[],
     options: AiCompletionOptions,
   ): Promise<
-    | { ok: true; completion: AiCompletion }
-    | { ok: false; retryable: boolean; reason: string }
+    { ok: true; completion: AiCompletion } | { ok: false; retryable: boolean; reason: string }
   > {
-
     // Se combina el temporizador propio con la senal de quien llama para que la
     // peticion se corte tanto si tarda demasiado como si el cliente se va.
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -119,7 +130,38 @@ export class OpenRouterProvider implements AiProvider {
         },
         body: JSON.stringify({
           model,
-          messages,
+          messages: messages.map((message) => ({
+            role: message.role,
+            content: message.image
+              ? [
+                  { type: 'text', text: message.content },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${message.image.mimeType};base64,${message.image.data}`,
+                    },
+                  },
+                ]
+              : message.content,
+            ...(message.toolCallId ? { tool_call_id: message.toolCallId } : {}),
+            ...(message.reasoningDetails ? { reasoning_details: message.reasoningDetails } : {}),
+            ...(message.toolCalls?.length
+              ? {
+                  tool_calls: message.toolCalls.map((call) => ({
+                    id: call.id,
+                    type: 'function',
+                    function: { name: call.name, arguments: call.arguments },
+                  })),
+                }
+              : {}),
+          })),
+          provider: {
+            data_collection: 'deny',
+            ...(options.tools?.length ? { require_parameters: true } : {}),
+          },
+          ...(options.tools?.length
+            ? { tools: options.tools.map((tool) => ({ type: 'function', function: tool })) }
+            : {}),
           temperature: options.temperature ?? 0.3,
           max_tokens: options.maxTokens ?? 700,
         }),
@@ -156,18 +198,25 @@ export class OpenRouterProvider implements AiProvider {
 
     const content = payload.choices?.[0]?.message?.content?.trim();
 
-    if (!content) {
+    const toolCalls = payload.choices?.[0]?.message?.tool_calls?.map((call) => ({
+      id: call.id,
+      name: call.function.name,
+      arguments: call.function.arguments,
+    }));
+    if (!content && !toolCalls?.length) {
       return { ok: false, retryable: true, reason: 'respuesta vacia' };
     }
 
     // Un modelo puede responder rapido y en el formato equivocado; para quien
     // llamo eso es tan inservible como un error, asi que cuenta como fallo.
-    if (options.validate && !options.validate(content)) {
+    if (!toolCalls?.length && options.validate && !options.validate(content ?? '')) {
       return { ok: false, retryable: true, reason: 'formato inesperado' };
     }
 
     const completion: AiCompletion = {
-      content,
+      content: content ?? '',
+      toolCalls,
+      reasoningDetails: payload.choices?.[0]?.message?.reasoning_details,
       model: payload.model ?? model,
       provider: this.name,
       ...(payload.usage
@@ -176,6 +225,7 @@ export class OpenRouterProvider implements AiProvider {
               promptTokens: payload.usage.prompt_tokens ?? 0,
               completionTokens: payload.usage.completion_tokens ?? 0,
               totalTokens: payload.usage.total_tokens ?? 0,
+              ...(typeof payload.usage.cost === 'number' ? { cost: payload.usage.cost } : {}),
             },
           }
         : {}),

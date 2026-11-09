@@ -18,4 +18,5 @@ export * from './portal';
 export * from './project';
 export * from './report';
 export * from './settings';
+export * from './support';
 export * from './ticket';

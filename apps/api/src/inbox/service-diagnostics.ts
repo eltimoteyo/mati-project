@@ -2,6 +2,7 @@ import { lookup as dnsLookup, type LookupAddress, promises as dns } from 'node:d
 import http from 'node:http';
 import https from 'node:https';
 import type { LookupFunction } from 'node:net';
+import { isIP } from 'node:net';
 import tls from 'node:tls';
 
 /**
@@ -106,12 +107,15 @@ export function extractMentionedHosts(text: string): string[] {
  * -------------------------------------------------------------------------- */
 
 /** Ejecuta las comprobaciones en paralelo y devuelve una linea legible por cada una. */
-export async function runDiagnostics(targets: DiagnosticTarget[]): Promise<string[]> {
+export async function runDiagnostics(
+  targets: DiagnosticTarget[],
+  signal: AbortSignal = AbortSignal.timeout(15_000),
+): Promise<string[]> {
   const checks: Array<Promise<string>> = [];
 
   for (const target of targets) {
     if (target.url) {
-      checks.push(checkWebsite(target.label, target.url));
+      checks.push(checkWebsite(target.label, target.url, signal));
 
       const parsed = safeUrl(target.url);
 
@@ -128,7 +132,7 @@ export async function runDiagnostics(targets: DiagnosticTarget[]): Promise<strin
   );
 }
 
-async function checkWebsite(label: string, rawUrl: string): Promise<string> {
+async function checkWebsite(label: string, rawUrl: string, signal: AbortSignal): Promise<string> {
   let url = safeUrl(rawUrl);
 
   if (!url) return `${label} (${rawUrl}): la direccion no es valida.`;
@@ -137,7 +141,7 @@ async function checkWebsite(label: string, rawUrl: string): Promise<string> {
 
   try {
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const response = await request(url);
+      const response = await request(url, signal);
 
       if (response.status >= 300 && response.status < 400 && response.location) {
         const next = safeUrl(new URL(response.location, url).toString());
@@ -156,7 +160,17 @@ async function checkWebsite(label: string, rawUrl: string): Promise<string> {
             ? `responde con un error del servidor (HTTP ${response.status})`
             : `responde con un error (HTTP ${response.status})`;
 
-      return `${label} (${url.toString()}): ${verdict} en ${elapsed} ms.`;
+      const contentHint =
+        /(?:Fatal error:|Parse error:|Apache2 Debian Default Page|Index of \/)/i.test(
+          response.body ?? '',
+        )
+          ? ' El contenido parece una página predeterminada o un error de aplicación.'
+          : '';
+      const redirectHint =
+        url.hostname !== safeUrl(rawUrl)?.hostname
+          ? ` Redirige a ${url.hostname}; confirma que sea el destino previsto.`
+          : '';
+      return `${label} (${url.toString()}): ${verdict} en ${elapsed} ms.${contentHint}${redirectHint}`;
     }
 
     return `${label} (${rawUrl}): demasiadas redirecciones.`;
@@ -229,6 +243,25 @@ interface DnsQueries {
   resolveMx(hostname: string): Promise<Array<{ exchange: string; priority: number }>>;
 }
 
+/** Lectura pública acotada, también en cada salto de RDAP. No envía credenciales. */
+export async function readPublicJson(
+  rawUrl: string,
+  signal: AbortSignal = AbortSignal.timeout(6000),
+): Promise<unknown> {
+  let url = safeUrl(rawUrl);
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!url) throw new Error('Destino inválido');
+    const response = await request(url, signal);
+    if (response.location && response.status >= 300 && response.status < 400) {
+      url = safeUrl(new URL(response.location, url).toString());
+      continue;
+    }
+    if (response.status !== 200) throw new Error('RDAP no disponible');
+    return JSON.parse(response.body ?? '') as unknown;
+  }
+  throw new Error('Demasiadas redirecciones');
+}
+
 /**
  * Resolutores publicos para las comprobaciones de dominio.
  *
@@ -260,13 +293,15 @@ async function resolveDns<T>(query: (resolver: DnsQueries) => Promise<T>): Promi
 }
 
 /** Solo http(s) a puertos estandar. */
-function safeUrl(value: string): URL | null {
+export function safeUrl(value: string): URL | null {
   try {
     const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
 
     if (!['http:', 'https:'].includes(url.protocol)) return null;
     if (url.port && !['80', '443'].includes(url.port)) return null;
     if (url.username || url.password) return null;
+    const address = url.hostname.replace(/^\[|\]$/g, '');
+    if (isIP(address) && !isPublicAddress(address)) return null;
 
     return url;
   } catch {
@@ -280,7 +315,7 @@ function safeUrl(value: string): URL | null {
  * Se aplica en el momento de conectar, no antes: comprobar y conectar por
  * separado permitiria que el DNS cambiase entre medias.
  */
-const safeLookup: LookupFunction = (hostname, options, callback) => {
+export const safeLookup: LookupFunction = (hostname, options, callback) => {
   dnsLookup(hostname, { ...options, all: true }, (error, addresses) => {
     if (error) {
       callback(error, '', 4);
@@ -308,6 +343,15 @@ const safeLookup: LookupFunction = (hostname, options, callback) => {
 
 /** `true` si la direccion es de internet publico. */
 export function isPublicAddress(address: string): boolean {
+  if (!isIP(address)) return false;
+  // IPv4 embebida en IPv6 también debe pasar por las reglas de IPv4.
+  const hexMapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(address);
+  if (hexMapped) {
+    const n = (BigInt(parseInt(hexMapped[1]!, 16)) << 16n) | BigInt(parseInt(hexMapped[2]!, 16));
+    return isPublicAddress(
+      [24n, 16n, 8n, 0n].map((shift) => Number((n >> shift) & 255n)).join('.'),
+    );
+  }
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
   const ip = mapped?.[1] ?? address;
 
@@ -324,30 +368,39 @@ export function isPublicAddress(address: string): boolean {
       (a === 172 && b >= 16 && b <= 31) ||
       (a === 192 && b === 168) ||
       (a === 192 && b === 0) ||
-      (a === 198 && (b === 18 || b === 19))
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 192 && b === 2) ||
+      (a === 198 && b === 51) ||
+      (a === 203 && b === 0)
     );
   }
 
   const lower = ip.toLowerCase();
 
-  return !(
-    lower === '::' ||
-    lower === '::1' ||
-    lower.startsWith('fc') ||
-    lower.startsWith('fd') ||
-    /^fe[89ab]/.test(lower) ||
-    lower.startsWith('ff') ||
-    lower.startsWith('2001:db8')
+  return (
+    /^2[0-9a-f]{3}:/i.test(lower) &&
+    !(
+      lower === '::' ||
+      lower === '::1' ||
+      lower.startsWith('fc') ||
+      lower.startsWith('fd') ||
+      /^fe[89ab]/.test(lower) ||
+      lower.startsWith('ff') ||
+      lower.startsWith('2001:db8') ||
+      lower.startsWith('2001:0:') ||
+      lower.startsWith('2002:')
+    )
   );
 }
 
 interface HttpResult {
   status: number;
   location?: string;
+  body?: string;
 }
 
 /** Peticion GET que solo lee la cabecera de la respuesta. */
-function request(url: URL): Promise<HttpResult> {
+function request(url: URL, signal: AbortSignal): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'https:' ? https : http;
 
@@ -357,6 +410,7 @@ function request(url: URL): Promise<HttpResult> {
         method: 'GET',
         lookup: safeLookup,
         timeout: CHECK_TIMEOUT_MS,
+        signal: AbortSignal.any([signal, AbortSignal.timeout(CHECK_TIMEOUT_MS)]),
         // El certificado se valora aparte: aqui solo importa si el servidor contesta.
         rejectUnauthorized: false,
         headers: { 'User-Agent': 'CONIT-Support-Diagnostico/1.0', Accept: 'text/html,*/*' },
@@ -364,12 +418,36 @@ function request(url: URL): Promise<HttpResult> {
       (res) => {
         const location = res.headers.location;
 
-        resolve({ status: res.statusCode ?? 0, ...(location ? { location } : {}) });
-        res.destroy();
+        const chunks: Buffer[] = [];
+        let size = 0;
+        const done = () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            ...(location ? { location } : {}),
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        if (location) {
+          done();
+          res.destroy();
+          return;
+        }
+        res.on('data', (data: Buffer) => {
+          const part = data.subarray(0, Math.max(0, 32768 - size));
+          chunks.push(part);
+          size += part.length;
+          if (size >= 32768) {
+            done();
+            res.destroy();
+          }
+        });
+        res.on('end', done);
+        res.on('error', reject);
       },
     );
 
-    req.on('timeout', () => req.destroy(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })));
+    req.on('timeout', () =>
+      req.destroy(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })),
+    );
     req.on('error', reject);
     req.end();
   });

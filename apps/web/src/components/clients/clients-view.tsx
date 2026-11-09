@@ -36,6 +36,7 @@ import { createConitColumnHelper, DataTable } from '@/components/data-table/data
 import { ActiveStatusBadge } from '@/components/domain/badges';
 import { useClients, useDeleteClient } from '@/hooks/use-clients';
 
+import { ClientContactsDialog } from './client-contacts-dialog';
 import { ClientFormDialog } from './client-form-dialog';
 import { PortalAccessDialog } from './portal-access-dialog';
 
@@ -50,6 +51,7 @@ export function ClientsView() {
   const [portalOpen, setPortalOpen] = useState(false);
   const [portalClient, setPortalClient] = useState<ClientWithCounts | null>(null);
   const [editing, setEditing] = useState<ClientWithCounts | null>(null);
+  const [contactsClient, setContactsClient] = useState<ClientWithCounts | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ClientWithCounts | null>(null);
 
   const query = useClients({ page, search: search || undefined, status: status || undefined });
@@ -128,6 +130,10 @@ export function ClientsView() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => setContactsClient(row.original)}>
+                    <UsersIcon />
+                    Contactos de WhatsApp
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
                       setEditing(row.original);
@@ -247,13 +253,16 @@ export function ClientsView() {
         </>
       )}
 
-      <PortalAccessDialog
-        open={portalOpen}
-        onOpenChange={setPortalOpen}
-        client={portalClient}
-      />
+      <PortalAccessDialog open={portalOpen} onOpenChange={setPortalOpen} client={portalClient} />
 
       <ClientFormDialog open={formOpen} onOpenChange={setFormOpen} client={editing} />
+      {contactsClient ? (
+        <ClientContactsDialog
+          key={contactsClient.id}
+          client={contactsClient}
+          onClose={() => setContactsClient(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={pendingDelete !== null}

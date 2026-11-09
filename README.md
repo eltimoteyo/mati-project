@@ -181,6 +181,11 @@ salta con `Esc` y no aparece para quien pide movimiento reducido. ♿
 
 ### 🤖 Asistente de IA *(opcional)*
 
+El agente de WhatsApp admite **Claude mediante Anthropic directo** y modelos de
+OpenRouter, con identificación, memoria de casos, herramientas, cola persistente
+y supervisión. Configuración y despliegue en
+[`docs/support-ai.md`](docs/support-ai.md).
+
 Redacta borradores de respuesta ✍️, sugiere clasificación 🏷️ y resume casos
 largos 📝. La categoría sale del **catálogo real** y nada se aplica sin que una
 persona lo confirme. Sin clave configurada, el asistente se declara no disponible
@@ -251,7 +256,7 @@ stateDiagram-v2
 
 | | | Versión |
 | :-: | :--- | :--- |
-| 🟢 | Node.js | `>= 22` |
+| 🟢 | Node.js LTS | `>= 22.12` |
 | 📦 | pnpm | `>= 10` |
 | 🐘 | PostgreSQL | `17` o `18` *(o Docker)* |
 
