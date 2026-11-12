@@ -123,11 +123,12 @@ function MessageBubble({
         <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
           {message.body}
         </p>
-        {message.aiGenerated ? (
-          <InboxFeedback conversationId={conversationId} message={message} />
-        ) : null}
-
-        <div className="flex items-center justify-end gap-1 text-[0.6875rem] text-muted-foreground">
+        <div className="flex items-end justify-end gap-1 text-[0.6875rem] text-muted-foreground">
+          {message.aiGenerated ? (
+            <div className="mr-auto">
+              <InboxFeedback conversationId={conversationId} message={message} />
+            </div>
+          ) : null}
           <time dateTime={message.createdAt} className="tabular">
             {format(new Date(message.createdAt), 'd MMM, HH:mm', { locale: es })}
           </time>

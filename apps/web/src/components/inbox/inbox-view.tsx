@@ -61,13 +61,13 @@ export function InboxView({
   const conversation = detail.data;
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Bandeja"
-        description="Mensajes de WhatsApp de los clientes. Responde desde aqui y crea un ticket cuando el caso lo pida."
-      />
+    <div className="flex flex-col gap-4">
+      {/* Sin descripcion: cada linea de cabecera es una linea menos de chat. */}
+      <PageHeader title="Bandeja" />
 
-      <Card className="grid h-[calc(100dvh-12rem)] min-h-[30rem] overflow-hidden lg:h-[calc(100dvh-13.5rem)] lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)_18rem]">
+      {/* El panel de identificacion y caso solo cabe fijo en pantallas muy
+          anchas; en el resto se abre con "Acciones" y el chat usa todo el ancho. */}
+      <Card className="grid h-[calc(100dvh-10rem)] min-h-[30rem] overflow-hidden lg:h-[calc(100dvh-11rem)] lg:grid-cols-[18rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)_20rem]">
         <section
           aria-label="Conversaciones"
           className={cn('min-h-0 border-border lg:block lg:border-r', selectedId && 'hidden')}
@@ -110,7 +110,7 @@ export function InboxView({
               actions={
                 <Sheet>
                   <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="xl:hidden">
+                    <Button variant="outline" size="sm" className="2xl:hidden">
                       <PanelRightOpenIcon />
                       Acciones
                     </Button>
@@ -128,7 +128,7 @@ export function InboxView({
           )}
         </section>
 
-        <aside aria-label="Acciones" className="hidden min-h-0 border-l border-border xl:block">
+        <aside aria-label="Acciones" className="hidden min-h-0 border-l border-border 2xl:block">
           {conversation ? <InboxSidePanel conversation={conversation} /> : null}
         </aside>
       </Card>

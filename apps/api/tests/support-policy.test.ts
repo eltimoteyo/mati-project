@@ -8,7 +8,9 @@ import {
   parseDecision,
   permittedTool,
   redactSecrets,
+  removeUnsafeLinks,
   safeReply,
+  stripSignature,
 } from '../src/inbox/agent/support-policy';
 import { parseMetaWebhook, verifyMetaSignature } from '../src/inbox/meta-webhook';
 import { extractMentionedHosts, isPublicAddress } from '../src/inbox/service-diagnostics';
@@ -173,5 +175,29 @@ describe('Webhook de Meta', () => {
     expect(events.messages[0]).toMatchObject({ mediaId: 'media-test', mimeType: 'audio/ogg' });
     expect(parseMetaWebhook(null, undefined).messages).toEqual([]);
     expect(parseMetaWebhook({ entry: [{}] }, undefined).messages).toEqual([]);
+  });
+});
+
+describe('Limpieza de la respuesta antes de enviarla', () => {
+  it('quita solo la frase con un enlace externo y conserva el resto', () => {
+    const text =
+      'Tu dominio no resuelve en DNS. Puedes comprobarlo en https://downforeveryoneorjustme.com ahora. Revisa también https://conit.pe/soporte para más ayuda.';
+    const clean = removeUnsafeLinks(text, ['conit.pe']);
+    expect(clean).toContain('Tu dominio no resuelve en DNS.');
+    expect(clean).toContain('https://conit.pe/soporte');
+    expect(clean).not.toContain('downforeveryoneorjustme');
+  });
+  it('conserva los saltos de línea de una lista de pasos', () => {
+    const clean = removeUnsafeLinks(
+      ['Prueba esto:', '1. Borra la caché.', '2. Usa otro navegador.'].join('\n'),
+      [],
+    );
+    expect(clean.split('\n')).toHaveLength(3);
+  });
+  it('quita la firma que la IA copia de los mensajes anteriores', () => {
+    expect(stripSignature('¡Hola! ¿En qué te ayudo?\n\n— Asistente virtual de CONIT')).toBe(
+      '¡Hola! ¿En qué te ayudo?',
+    );
+    expect(stripSignature('Listo.\n\n_Asistente virtual de CONIT_')).toBe('Listo.');
   });
 });

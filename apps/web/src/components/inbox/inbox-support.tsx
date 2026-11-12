@@ -1,8 +1,9 @@
 'use client';
 
 import type { InboxConversationDetail, InboxMessage } from '@conit/types';
-import { Badge, Button, Input } from '@conit/ui';
+import { Badge, Button, cn, Input } from '@conit/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ThumbsDownIcon, ThumbsUpIcon } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
@@ -176,6 +177,12 @@ export function InboxMedia({
   );
 }
 
+/**
+ * Valoracion de una respuesta de la IA.
+ *
+ * Ocupa una linea con dos iconos junto a la hora: debajo de cada mensaje
+ * dejaba el chat sin sitio. El motivo solo se pide al marcarla como mala.
+ */
 export function InboxFeedback({
   conversationId,
   message,
@@ -184,43 +191,70 @@ export function InboxFeedback({
   message: InboxMessage;
 }) {
   const cache = useQueryClient();
+  const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState('');
   const save = useMutation({
-    mutationFn: (value: number) =>
-      supportService.feedback(conversationId, message.id, value, reason),
+    mutationFn: ({ value, note }: { value: number; note: string }) =>
+      supportService.feedback(conversationId, message.id, value, note),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: queryKeys.inbox.all });
+      setAsking(false);
+      setReason('');
       notify.success('Valoración guardada');
     },
     onError: (error) => notify.fromError(error, 'No se pudo guardar la valoración'),
   });
+
   return (
-    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-0.5">
         <Button
-          size="sm"
-          variant={message.feedback === 1 ? 'default' : 'ghost'}
+          size="icon-sm"
+          variant="ghost"
+          className={cn('size-6', message.feedback === 1 && 'text-success')}
+          aria-label="Buena respuesta"
+          title="Buena respuesta"
+          aria-pressed={message.feedback === 1}
           disabled={save.isPending}
-          onClick={() => save.mutate(1)}
+          onClick={() => save.mutate({ value: 1, note: '' })}
         >
-          Buena respuesta
+          <ThumbsUpIcon className="size-3.5" aria-hidden="true" />
         </Button>
         <Button
-          size="sm"
-          variant={message.feedback === -1 ? 'default' : 'ghost'}
+          size="icon-sm"
+          variant="ghost"
+          className={cn('size-6', message.feedback === -1 && 'text-destructive')}
+          aria-label="Mala respuesta"
+          title="Mala respuesta"
+          aria-pressed={message.feedback === -1}
           disabled={save.isPending}
-          onClick={() => save.mutate(-1)}
+          onClick={() => setAsking((value) => !value)}
         >
-          Mala respuesta
+          <ThumbsDownIcon className="size-3.5" aria-hidden="true" />
         </Button>
       </div>
-      <Input
-        aria-label="Motivo de la valoración"
-        placeholder="Motivo (opcional)"
-        value={reason}
-        maxLength={500}
-        onChange={(event) => setReason(event.target.value)}
-      />
+      {asking ? (
+        <form
+          className="flex items-center gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save.mutate({ value: -1, note: reason });
+          }}
+        >
+          <Input
+            aria-label="Motivo de la valoración"
+            placeholder="¿Qué falló? (opcional)"
+            value={reason}
+            maxLength={500}
+            autoFocus
+            className="h-8 text-xs"
+            onChange={(event) => setReason(event.target.value)}
+          />
+          <Button type="submit" size="sm" variant="outline" loading={save.isPending}>
+            Guardar
+          </Button>
+        </form>
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,10 @@ function setup(
     available?: boolean;
     action?: string;
     inbound?: string;
+    message?: string;
+    stage?: string;
+    ticketId?: string;
+    outcome?: { kind: 'confirm' | 'done'; text: string };
   } = {},
 ) {
   const conversation = {
@@ -36,11 +40,11 @@ function setup(
   };
   const supportCase = {
     id: 'case',
-    stage: 'TRIAGE',
+    stage: options.stage ?? 'TRIAGE',
     facts: {},
     stepsTried: [],
     attempts: options.attempts ?? 0,
-    ticketId: null,
+    ticketId: options.ticketId ?? null,
     summary: '',
   };
   const prisma = {
@@ -62,7 +66,7 @@ function setup(
       .fn()
       .mockResolvedValue({
         action: options.action ?? 'troubleshoot',
-        message: 'Prueba con otro navegador',
+        message: options.message ?? 'Prueba con otro navegador',
         summary: 'Problema de acceso',
         facts: {},
         stepsTried: [],
@@ -72,7 +76,9 @@ function setup(
   const cases = { current: vi.fn().mockResolvedValue(supportCase) };
   const tools = {
     notify: vi.fn(),
-    escalate: vi.fn().mockResolvedValue('Ticket registrado CNT-0001'),
+    escalate: vi
+      .fn()
+      .mockResolvedValue(options.outcome ?? { kind: 'done', text: 'Ticket registrado CNT-0001' }),
   };
   const settings = {
     getAutomation: vi.fn().mockResolvedValue({ whatsappAutoReply: true }),
@@ -161,6 +167,67 @@ describe('Escenarios de la respuesta automática', () => {
       });
     await env.respond();
     expect(env.cloud.sendText).not.toHaveBeenCalled();
+  });
+  it('con ticket abierto envía lo que contestó la IA, no un estado fijo', async () => {
+    const env = setup({
+      ticketId: 'ticket',
+      stage: 'FOLLOW_UP',
+      action: 'reply',
+      inbound: '¿Por qué pasa esto?',
+      message: 'El dominio no resuelve en DNS: por eso la web no carga.',
+    });
+    await env.respond();
+    const body = env.cloud.sendText.mock.calls[0]![0].body as string;
+    expect(body).toContain('El dominio no resuelve en DNS');
+    expect(body).not.toContain('está en estado');
+    expect(env.tools.escalate).not.toHaveBeenCalled();
+  });
+  it('si el cliente confirma el registro pendiente, deriva aunque la IA contestara otra cosa', async () => {
+    const env = setup({ stage: 'ESCALATED', action: 'reply', inbound: 'dale, regístralo' });
+    await env.respond();
+    expect(env.tools.escalate).toHaveBeenCalledOnce();
+  });
+  it('al ofrecer el registro conserva la respuesta de la IA', async () => {
+    const env = setup({
+      action: 'escalate',
+      message: 'Parece un problema del servidor de correo.',
+      outcome: { kind: 'confirm', text: '¿Quieres que registre el caso?' },
+    });
+    await env.respond();
+    const body = env.cloud.sendText.mock.calls[0]![0].body as string;
+    expect(body).toContain('Parece un problema del servidor de correo.');
+    expect(body).toContain('¿Quieres que registre el caso?');
+  });
+  it('si la IA ya pregunta por el registro no se repite la pregunta', async () => {
+    const env = setup({
+      action: 'escalate',
+      message: 'Parece un problema del servidor. ¿Quieres que lo registre para el equipo?',
+      outcome: { kind: 'confirm', text: '¿Quieres que registre el caso?' },
+    });
+    await env.respond();
+    const body = env.cloud.sendText.mock.calls[0]![0].body as string;
+    expect(body).not.toContain('¿Quieres que registre el caso?');
+  });
+  it('un enlace externo no convierte la respuesta en una oferta de ticket', async () => {
+    const env = setup({
+      action: 'troubleshoot',
+      message:
+        'Tu web no responde. Compruébalo en https://downforeveryoneorjustme.com por favor. Borra la caché y vuelve a probar.',
+    });
+    await env.respond();
+    const body = env.cloud.sendText.mock.calls[0]![0].body as string;
+    expect(env.tools.escalate).not.toHaveBeenCalled();
+    expect(body).toContain('Borra la caché');
+    expect(body).not.toContain('downforeveryoneorjustme');
+  });
+  it('la firma sale una sola vez aunque la IA la copie', async () => {
+    const env = setup({
+      action: 'reply',
+      message: '¡Buenas tardes! Cuéntame qué pasa.\n\n— Asistente virtual de CONIT',
+    });
+    await env.respond();
+    const body = env.cloud.sendText.mock.calls[0]![0].body as string;
+    expect(body.match(/Asistente virtual de CONIT/g)).toHaveLength(1);
   });
   it('no contesta más de diez veces por hora', async () => {
     const env = setup();

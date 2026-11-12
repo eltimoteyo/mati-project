@@ -109,25 +109,64 @@ const ASKS_FOR_SECRET = new RegExp(
 const CONTAINS_SECRET =
   /(?:contrase[nñ]a|password|clave)(?:\s+(?:nueva|temporal|actual))?\s*(?:[:=]|\bes\b:?)\s*["'«“]?(?=[^\s"'»”]*[\d@#$%&*!?])[^\s"'»”]{6,}/i;
 
+const LINK = /(?:https?:\/\/|www\.)[^\s<>]+/gi;
+
+function linkAllowed(link: string, allowedDomains: string[]) {
+  try {
+    const url = new URL(link.startsWith('www.') ? `https://${link}` : link);
+    return (
+      !url.username &&
+      !url.password &&
+      ['http:', 'https:'].includes(url.protocol) &&
+      allowedDomains.some((domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function safeReply(text: string, allowedDomains: string[]): boolean {
   if (ASKS_FOR_SECRET.test(text) || CONTAINS_SECRET.test(text)) return false;
   if (/sk-[a-zA-Z0-9_-]{15,}|-----BEGIN .*PRIVATE KEY-----/i.test(text)) return false;
-  const links = text.match(/(?:https?:\/\/|www\.)[^\s<>]+/gi) ?? [];
-  return links.every((link) => {
-    try {
-      const url = new URL(link.startsWith('www.') ? `https://${link}` : link);
-      return (
-        !url.username &&
-        !url.password &&
-        ['http:', 'https:'].includes(url.protocol) &&
-        allowedDomains.some(
-          (domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+  return (text.match(LINK) ?? []).every((link) => linkAllowed(link, allowedDomains));
+}
+
+/**
+ * Quita las frases con enlaces no permitidos.
+ *
+ * La IA a veces recomienda una web externa para comprobar una caida. Antes
+ * eso descartaba toda la respuesta y se ofrecia un ticket sin contestar al
+ * cliente; ahora solo se pierde esa frase.
+ */
+export function removeUnsafeLinks(text: string, allowedDomains: string[]) {
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) =>
+          (sentence.match(LINK) ?? []).every((link) => linkAllowed(link, allowedDomains)),
         )
-      );
-    } catch {
-      return false;
-    }
-  });
+        .join(' '),
+    )
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Firma que el servidor añade a cada mensaje de la IA. */
+export const AI_SIGNATURE = '— Asistente virtual de CONIT';
+
+/**
+ * Quita la firma, la actual y la anterior (`_Asistente virtual de CONIT_`).
+ *
+ * La IA ve su firma en los mensajes previos y tiende a copiarla; como el
+ * servidor la añade al enviar, salia dos veces.
+ */
+export function stripSignature(text: string) {
+  return text
+    .replace(/[—–-]?\s*_?Asistente virtual de CONIT_?/gi, '')
+    .replace(/\s+$/, '');
 }
 
 export function redactSecrets(text: string) {
@@ -147,9 +186,10 @@ export function mergeSteps(previous: unknown, next: z.infer<typeof stepsSchema>)
 
 export function confirmsEscalation(text: string, pending: boolean) {
   if (/^\s*no\b/i.test(text)) return false;
-  const affirmative = /^\s*(?:s[ií]|ok|vale|de acuerdo|confirmo|autorizo)(?:\s|[.!,]|$)/i.test(
-    text,
-  );
+  const affirmative =
+    /^\s*(?:s[ií]p?|ok(?:ey|ay)?|vale|dale|claro|bueno|perfecto|correcto|adelante|de acuerdo|est[aá] bien|por favor|confirmo|confirmado|autorizo|hazlo|h[aá]galo|proced[ae]|reg[ií]stra(?:lo|la)?)(?:\s|[.!,]|$)/i.test(
+      text,
+    );
   const explicit =
     /\b(?:registra|registren|crea|creen)\s+(?:el|mi|un)\s+(?:ticket|caso)\b|\bquiero\s+(?:hablar\s+con\s+)?(?:una persona|un humano|un t[eé]cnico)\b/i.test(
       text,

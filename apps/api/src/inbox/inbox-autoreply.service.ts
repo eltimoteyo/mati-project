@@ -13,7 +13,16 @@ import { WhatsappConversationsService } from '../whatsapp/whatsapp-conversations
 import { WhatsappMediaService } from '../whatsapp/whatsapp-media.service';
 import { SupportAgentService } from './agent/support-agent.service';
 import { SupportCasesService } from './agent/support-cases.service';
-import { canTransition, factsSchema, mergeSteps, safeReply } from './agent/support-policy';
+import {
+  AI_SIGNATURE,
+  canTransition,
+  confirmsEscalation,
+  factsSchema,
+  mergeSteps,
+  removeUnsafeLinks,
+  safeReply,
+  stripSignature,
+} from './agent/support-policy';
 import { SupportToolsService } from './agent/support-tools.service';
 import { replyWindowEnd } from './inbox.mapper';
 import { domainOf } from './service-diagnostics';
@@ -256,6 +265,10 @@ export class InboxAutoReplyService implements OnModuleInit, OnModuleDestroy {
         'Antes de revisar el problema, indica el RUC o empresa, tu nombre y tu correo para identificarte.';
     }
     if (action === 'troubleshoot' && supportCase.attempts >= 2) action = 'escalate';
+    // El cliente confirma el registro que se le ofrecio: se crea aunque el
+    // modelo haya contestado otra cosa en este turno.
+    const pendingConfirmation = supportCase.stage === 'ESCALATED' && !supportCase.ticketId;
+    if (pendingConfirmation && confirmsEscalation(inbound.body, true)) action = 'escalate';
     if (supportCase.ticketId) action = 'follow_up';
     if (supportCase.stage === 'FOLLOW_UP' && !supportCase.ticketId && action !== 'resolved')
       action = 'follow_up';
@@ -274,7 +287,11 @@ export class InboxAutoReplyService implements OnModuleInit, OnModuleDestroy {
           : [],
       ),
     ];
-    if (!safeReply(decision.message, allowed)) {
+    // Lo que escribio la IA solo se descarta si no es seguro enviarlo: un
+    // enlace externo se quita con su frase y la firma la pone el servidor.
+    decision.message = stripSignature(removeUnsafeLinks(decision.message, allowed));
+    const unsafe = !decision.message.trim() || !safeReply(decision.message, allowed);
+    if (unsafe) {
       action = 'escalate';
       decision.message = 'El equipo técnico continuará la atención por esta conversación.';
     }
@@ -295,9 +312,19 @@ export class InboxAutoReplyService implements OnModuleInit, OnModuleDestroy {
                 : stage;
     if (canTransition(stage, next, identified, confirmed)) stage = next;
     const updated = { ...supportCase, facts, stepsTried: steps, summary: decision.summary };
-    if (action === 'escalate')
-      text = await this.tools.escalate(conversationId, updated, decision, inbound.body);
-    if (action === 'follow_up' && supportCase.ticketId) {
+    if (action === 'escalate') {
+      const outcome = await this.tools.escalate(conversationId, updated, decision, inbound.body);
+      const answer = unsafe ? '' : decision.message.trim();
+      // La respuesta de la IA va primero: suele contestar a lo que pregunto el
+      // cliente. Si ya pide la confirmacion, no se repite la del servidor.
+      text =
+        outcome.kind === 'confirm' && answer.includes('?')
+          ? answer
+          : [answer, outcome.text].filter(Boolean).join('\n\n');
+    }
+    // Con ticket abierto la IA sigue contestando lo que se le pregunta; el
+    // estado fijo solo se usa si no devolvio nada que enviar.
+    if (action === 'follow_up' && supportCase.ticketId && !text.trim()) {
       if (fresh.identityStatus === 'VERIFIED' && fresh.clientId) {
         const ticket = await this.prisma.ticket.findFirst({
           where: { id: supportCase.ticketId, clientId: fresh.clientId },
@@ -315,11 +342,14 @@ export class InboxAutoReplyService implements OnModuleInit, OnModuleDestroy {
       const incident = oldFacts.incidentId
         ? await this.prisma.serviceIncident.findUnique({ where: { id: oldFacts.incidentId } })
         : null;
-      text = incident
-        ? incident.closedAt
+      // El estado de una incidencia general lo conoce el servidor, no la IA.
+      if (incident)
+        text = incident.closedAt
           ? 'Las últimas comprobaciones indican que el servicio se recuperó. ¿Puedes confirmar si ya funciona para ti?'
-          : 'La incidencia del servicio sigue registrada con el equipo. Aún no se ha confirmado su recuperación.'
-        : 'Tu consulta está con el equipo. La información nueva quedará registrada en esta conversación.';
+          : 'La incidencia del servicio sigue registrada con el equipo. Aún no se ha confirmado su recuperación.';
+      else if (!text.trim())
+        text =
+          'Tu consulta está con el equipo. La información nueva quedará registrada en esta conversación.';
     }
     if (action === 'resolved')
       text += '\n¿Se resolvió tu consulta? Puedes valorar la atención del 1 al 5.';
@@ -381,7 +411,7 @@ export class InboxAutoReplyService implements OnModuleInit, OnModuleDestroy {
     const conversation = await this.prisma.whatsappConversation.findUniqueOrThrow({
       where: { id: conversationId },
     });
-    const body = `${text}\n\n— Asistente virtual de CONIT`;
+    const body = `${stripSignature(text)}\n\n${AI_SIGNATURE}`;
     const result = await this.cloud.sendText({ to: conversation.phone, body });
     if (!result.sent)
       throw new Error(`Meta no aceptó la respuesta (${result.errorCode ?? 'sin código'})`);

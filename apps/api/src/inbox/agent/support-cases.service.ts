@@ -17,9 +17,20 @@ export class SupportCasesService {
       });
       const inbound = conversation.lastInboundAt ?? new Date();
       const identityChanged = active?.clientId && active.clientId !== conversation.clientId;
+      // Un ticket ya resuelto cierra el caso: lo siguiente que escriba el
+      // cliente es una consulta nueva, no un seguimiento de aquel ticket.
+      const ticketDone = active?.ticketId
+        ? Boolean(
+            await tx.ticket.findFirst({
+              where: { id: active.ticketId, status: { in: ['RESOLVED', 'CLOSED'] } },
+              select: { id: true },
+            }),
+          )
+        : false;
       if (
         active &&
         !identityChanged &&
+        !ticketDone &&
         inbound.getTime() - active.lastInboundAt.getTime() < 86_400_000
       ) {
         return tx.supportCase.update({
@@ -37,10 +48,14 @@ export class SupportCasesService {
         await tx.supportCase.update({
           where: { id: active.id },
           data: {
-            stage: 'ABANDONED',
-            closedAt: identityChanged
-              ? new Date()
-              : new Date(active.lastInboundAt.getTime() + 86_400_000),
+            stage: ticketDone ? 'RESOLVED' : 'ABANDONED',
+            // Se cierra en su ultimo mensaje atendido, no ahora: el cierre marca
+            // donde empieza el caso nuevo, y "ahora" dejaria fuera lo que el
+            // cliente acaba de escribir.
+            closedAt:
+              identityChanged || ticketDone
+                ? active.lastInboundAt
+                : new Date(active.lastInboundAt.getTime() + 86_400_000),
           },
         });
       const [lastClosed, lastOutbound] = await Promise.all([

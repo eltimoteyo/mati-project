@@ -97,6 +97,23 @@ export const SUPPORT_TOOLS: AiTool[] = [
   },
 ];
 
+/**
+ * Resultado de derivar. `confirm`: falta que el cliente acepte el registro;
+ * `done`: ya se hizo algo (ticket creado, enlazado o aviso al equipo).
+ */
+export interface EscalationOutcome {
+  kind: 'confirm' | 'done';
+  text: string;
+}
+
+/** "240 minutos" se lee peor que "4 horas". */
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutos`;
+  const hours = Math.round((minutes / 60) * 10) / 10;
+
+  return hours === 1 ? '1 hora' : `${String(hours).replace('.', ',')} horas`;
+}
+
 @Injectable()
 export class SupportToolsService {
   private readonly appUrl: string;
@@ -326,7 +343,7 @@ export class SupportToolsService {
     supportCase: SupportCase,
     decision: SupportDecision,
     inbound: string,
-  ) {
+  ): Promise<EscalationOutcome> {
     const conversation = await this.prisma.whatsappConversation.findUniqueOrThrow({
       where: { id: conversationId },
     });
@@ -335,7 +352,10 @@ export class SupportToolsService {
         'WhatsApp pendiente de identificación / comercial',
         `${conversation.profileName ?? 'Contacto'}: ${decision.summary}`,
       );
-      return 'He avisado al equipo para que te contacte y confirme la empresa. Tu consulta queda registrada en esta conversación.';
+      return {
+        kind: 'done',
+        text: 'He avisado al equipo para que te contacte y confirme la empresa. Tu consulta queda registrada en esta conversación.',
+      };
     }
     const urgent =
       /hacke|seguridad|datos.{0,25}(borrad|perdid|riesgo)|ca[ií]d[ao].{0,25}(todos|general)/i.test(
@@ -343,12 +363,18 @@ export class SupportToolsService {
       );
     const confirmed = confirmsEscalation(inbound, supportCase.stage === 'ESCALATED');
     if (!urgent && !confirmed && !supportCase.ticketId)
-      return 'Voy a registrar el caso para el equipo técnico. ¿Confirmas que lo registre? Indica también tu horario de contacto y, si puedes, el texto o una captura del error. Nunca envíes contraseñas.';
+      return {
+        kind: 'confirm',
+        text: '¿Quieres que registre el caso para el equipo técnico? Si es así, indícame también tu horario de contacto y, si puedes, el texto o una captura del error. Nunca envíes contraseñas.',
+      };
     if (supportCase.ticketId) {
       const existing = await this.prisma.ticket.findUniqueOrThrow({
         where: { id: supportCase.ticketId },
       });
-      return `Tu caso ya está registrado con el código ${formatTicketCode(existing.number)}.`;
+      return {
+        kind: 'done',
+        text: `Tu caso ya está registrado con el código ${formatTicketCode(existing.number)}.`,
+      };
     }
     const facts = factsSchema.parse(supportCase.facts);
     const projects =
@@ -372,7 +398,10 @@ export class SupportToolsService {
         where: { id: supportCase.id },
         data: { stage: 'FOLLOW_UP', facts: { ...facts, incidentId: incident.id } },
       });
-      return 'El equipo ya tiene detectada una incidencia en ese servicio. Tu caso quedó asociado para seguimiento y evitamos abrir otra incidencia por el mismo fallo.';
+      return {
+        kind: 'done',
+        text: 'El equipo ya tiene detectada una incidencia en ese servicio. Tu caso quedó asociado para seguimiento y evitamos abrir otra incidencia por el mismo fallo.',
+      };
     }
     const duplicate = project
       ? await this.prisma.ticket.findFirst({
@@ -419,7 +448,10 @@ export class SupportToolsService {
         `${formatTicketCode(duplicate.number)}: ${duplicate.subject}`,
         duplicate.id,
       );
-      return `Añadí la información a tu ticket abierto ${formatTicketCode(duplicate.number)} sobre ese servicio.`;
+      return {
+        kind: 'done',
+        text: `Añadí la información a tu ticket abierto ${formatTicketCode(duplicate.number)} sobre ese servicio.`,
+      };
     }
     const assignee = category?.defaultAssigneeId
       ? await this.prisma.user.findFirst({
@@ -451,6 +483,9 @@ export class SupportToolsService {
       },
     );
     const sla = category?.responseTimeMinutes;
-    return `He registrado el ticket ${ticket.code}.${sla ? ` El objetivo de primera respuesta es de ${sla} minutos.` : ' El equipo revisará tu caso.'}`;
+    return {
+      kind: 'done',
+      text: `He registrado el ticket ${ticket.code}.${sla ? ` El objetivo de primera respuesta es de ${formatDuration(sla)}.` : ' El equipo revisará tu caso.'}`,
+    };
   }
 }
