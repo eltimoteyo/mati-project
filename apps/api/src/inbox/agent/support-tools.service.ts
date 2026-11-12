@@ -35,6 +35,14 @@ const object = (properties: Record<string, unknown> = {}, required: string[] = [
   additionalProperties: false,
 });
 const string = { type: 'string' };
+/**
+ * Herramientas que se ofrecen al modelo: solo las que averiguan algo.
+ *
+ * Derivar o registrar se pide con `action: escalate` en la respuesta final.
+ * Ofrecer herramientas que no hacian nada ("crear_ticket", "derivar_a_persona",
+ * "guardar_caso") empujaba al modelo a derivar casi siempre y le hacia gastar
+ * las vueltas del turno sin responder.
+ */
 export const SUPPORT_TOOLS: AiTool[] = [
   {
     name: 'buscar_cliente',
@@ -77,23 +85,6 @@ export const SUPPORT_TOOLS: AiTool[] = [
     name: 'buscar_conocimiento',
     description: 'Busca las guías publicadas más relevantes por síntoma.',
     parameters: object({ consulta: string }, ['consulta']),
-  },
-  {
-    name: 'guardar_caso',
-    description:
-      'Consulta la memoria actual. Devuelve facts y stepsTried actualizados en el JSON final para guardarlos.',
-    parameters: object(),
-  },
-  {
-    name: 'crear_ticket',
-    description:
-      'Solicita derivación. Los datos del ticket se validan y crean al finalizar el turno, después de confirmar con el cliente salvo urgencia.',
-    parameters: object(),
-  },
-  {
-    name: 'derivar_a_persona',
-    description: 'Solicita intervención de soporte o comercial. Finaliza con action escalate.',
-    parameters: object(),
   },
 ];
 

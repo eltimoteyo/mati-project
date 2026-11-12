@@ -116,6 +116,25 @@ describe('Limites de la IA', () => {
     expect(body.output_config).toEqual({ effort: 'low' });
   });
 
+  it('en la ultima vuelta pide a Claude responder sin herramientas', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ model: 'claude-sonnet-5-5', content: [{ type: 'text', text: '{}' }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new AnthropicProvider(aiConfig()).complete([{ role: 'user', content: 'Hola' }], {
+      tools: [{ name: 'buscar_conocimiento', description: 'Guias', parameters: { type: 'object' } }],
+      toolChoice: 'none',
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as Record<string, unknown>;
+    expect(body.tool_choice).toEqual({ type: 'none' });
+    expect(body.tools).toHaveLength(1);
+  });
+
   it('no envia el esfuerzo a modelos anteriores que lo rechazan', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

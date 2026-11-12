@@ -51,6 +51,8 @@ export interface AiCompletionOptions {
    */
   validate?: (content: string) => boolean;
   tools?: AiTool[];
+  /** `none`: el modelo ve las herramientas pero debe responder sin usarlas. */
+  toolChoice?: 'auto' | 'none';
   /**
    * Cuanto razona el modelo antes de responder. Solo lo aplica Anthropic; el
    * resto de proveedores lo ignora.

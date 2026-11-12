@@ -97,6 +97,7 @@ export class AnthropicProvider implements AiProvider {
                 description: tool.description,
                 input_schema: tool.parameters,
               })),
+              ...(options.toolChoice === 'none' ? { tool_choice: { type: 'none' } } : {}),
             }
           : {}),
       }),

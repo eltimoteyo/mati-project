@@ -160,7 +160,10 @@ export class OpenRouterProvider implements AiProvider {
             ...(options.tools?.length ? { require_parameters: true } : {}),
           },
           ...(options.tools?.length
-            ? { tools: options.tools.map((tool) => ({ type: 'function', function: tool })) }
+            ? {
+                tools: options.tools.map((tool) => ({ type: 'function', function: tool })),
+                ...(options.toolChoice === 'none' ? { tool_choice: 'none' } : {}),
+              }
             : {}),
           temperature: options.temperature ?? 0.3,
           max_tokens: options.maxTokens ?? 700,
